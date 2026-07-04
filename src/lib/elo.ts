@@ -72,6 +72,7 @@ export function replay(matches: Match[]): ReplayResult {
         bestStreakStart: null,
         bestStreakEnd: null,
         bestRank: Number.MAX_SAFE_INTEGER,
+        bestRankDate: null,
         lastPlayed: null,
         history: [START_RATING],
       };
@@ -163,7 +164,10 @@ export function replay(matches: Match[]): ReplayResult {
     // any match, so re-rank all debuted players (tiny N, cost is trivial).
     const ranked = [...stats.values()].sort((a, b) => b.rating - a.rating);
     for (let i = 0; i < ranked.length; i++) {
-      if (i + 1 < ranked[i].bestRank) ranked[i].bestRank = i + 1;
+      if (i + 1 < ranked[i].bestRank) {
+        ranked[i].bestRank = i + 1;
+        ranked[i].bestRankDate = m.date;
+      }
     }
   }
 

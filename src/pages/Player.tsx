@@ -66,7 +66,7 @@ export default function PlayerPage() {
           <div className="stat-tile">
             <div className="label">Career-high rank</div>
             <div className="value">#{stats.bestRank}</div>
-            <div className="hint">best position ever held</div>
+            <div className="hint">reached {formatDate(stats.bestRankDate)}</div>
           </div>
           <div className="stat-tile">
             <div className="label">Current streak</div>

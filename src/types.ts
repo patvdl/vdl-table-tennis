@@ -29,6 +29,8 @@ export interface PlayerStats {
   bestStreakEnd: string | null;
   /** Best (lowest) leaderboard position ever held, 1 = top */
   bestRank: number;
+  /** Date the career-high rank was first reached */
+  bestRankDate: string | null;
   lastPlayed: string | null;
   /** Rating after each of the player's matches, for sparklines */
   history: number[];
