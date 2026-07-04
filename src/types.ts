@@ -17,10 +17,16 @@ export interface PlayerStats {
   wins: number;
   losses: number;
   peakRating: number;
+  /** Date the peak rating was reached (null if never above start) */
+  peakDate: string | null;
   /** Positive = winning streak, negative = losing streak */
   streak: number;
   /** Longest run of consecutive wins ever */
   bestStreak: number;
+  /** Date of the first win of the best streak */
+  bestStreakStart: string | null;
+  /** Date the best streak was broken (null = still active) */
+  bestStreakEnd: string | null;
   /** Best (lowest) leaderboard position ever held, 1 = top */
   bestRank: number;
   lastPlayed: string | null;

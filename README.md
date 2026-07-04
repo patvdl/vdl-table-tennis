@@ -13,6 +13,11 @@ head-to-head stats. Built with React + Vite, backed by Supabase, deployed on Git
   adds up — while an upset win pays out much more.
 - New players use a higher K-factor (40) for their first 10 matches so they settle
   quickly; established players use K=24.
+- **Streak dampening**: when the same player keeps beating the same opponent, each
+  consecutive win transfers 15% fewer points (floored at 20% of normal). Both sides
+  move less — so being dominated by one rival can't drag a player to the bottom of
+  the table, and the dominator can't farm one matchup forever. The moment the
+  underdog wins, damping resets and the upset pays out in full.
 - **Scores are stored for the record only. They never affect ELO** — only who won.
 
 ## Running locally

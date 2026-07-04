@@ -51,6 +51,9 @@ export default function PlayerPage() {
           <div className="stat-tile">
             <div className="label">Peak rating</div>
             <div className="value">{round0(stats.peakRating)}</div>
+            <div className="hint">
+              {stats.peakDate ? `reached ${formatDate(stats.peakDate)}` : "at start rating"}
+            </div>
           </div>
           <div className="stat-tile">
             <div className="label">Record</div>
@@ -74,7 +77,15 @@ export default function PlayerPage() {
           <div className="stat-tile">
             <div className="label">Best win streak</div>
             <div className="value">W{stats.bestStreak}</div>
-            <div className="hint">longest run of consecutive wins</div>
+            <div className="hint">
+              {stats.bestStreak === 0
+                ? "no wins yet"
+                : `started ${formatDate(stats.bestStreakStart)} · ${
+                    stats.bestStreakEnd
+                      ? `lost ${formatDate(stats.bestStreakEnd)}`
+                      : "still active"
+                  }`}
+            </div>
           </div>
           <div className="stat-tile">
             <div className="label">Last played</div>
