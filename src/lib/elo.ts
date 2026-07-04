@@ -46,6 +46,8 @@ export function replay(matches: Match[]): ReplayResult {
         losses: 0,
         peakRating: START_RATING,
         streak: 0,
+        bestStreak: 0,
+        bestRank: Number.MAX_SAFE_INTEGER,
         lastPlayed: null,
         history: [START_RATING],
       };
@@ -96,10 +98,19 @@ export function replay(matches: Match[]): ReplayResult {
       p2.streak = p2.streak > 0 ? p2.streak + 1 : 1;
       p1.streak = p1.streak < 0 ? p1.streak - 1 : -1;
     }
+    p1.bestStreak = Math.max(p1.bestStreak, p1.streak);
+    p2.bestStreak = Math.max(p2.bestStreak, p2.streak);
     p1.lastPlayed = m.date;
     p2.lastPlayed = m.date;
     p1.history.push(r1After);
     p2.history.push(r2After);
+
+    // Track career-high ranking: standings can shift for everyone after
+    // any match, so re-rank all debuted players (tiny N, cost is trivial).
+    const ranked = [...stats.values()].sort((a, b) => b.rating - a.rating);
+    for (let i = 0; i < ranked.length; i++) {
+      if (i + 1 < ranked[i].bestRank) ranked[i].bestRank = i + 1;
+    }
   }
 
   return { stats, enriched };

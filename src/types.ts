@@ -19,6 +19,10 @@ export interface PlayerStats {
   peakRating: number;
   /** Positive = winning streak, negative = losing streak */
   streak: number;
+  /** Longest run of consecutive wins ever */
+  bestStreak: number;
+  /** Best (lowest) leaderboard position ever held, 1 = top */
+  bestRank: number;
   lastPlayed: string | null;
   /** Rating after each of the player's matches, for sparklines */
   history: number[];

@@ -186,6 +186,27 @@ th {
   white-space: nowrap;
 }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+th.sortable:hover {
+  color: var(--text);
+}
+
+th.sortable.sorted {
+  color: var(--accent);
+}
+
+.sort-arrow {
+  display: inline-block;
+  width: 14px;
+  font-size: 9px;
+  margin-left: 3px;
+}
+
 td {
   padding: 10px 12px;
   border-bottom: 1px solid #222a3655;

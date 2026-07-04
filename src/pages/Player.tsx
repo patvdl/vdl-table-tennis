@@ -61,10 +61,20 @@ export default function PlayerPage() {
             <div className="hint">{pct(stats.wins / Math.max(stats.played, 1))} win rate</div>
           </div>
           <div className="stat-tile">
-            <div className="label">Streak</div>
+            <div className="label">Career-high rank</div>
+            <div className="value">#{stats.bestRank}</div>
+            <div className="hint">best position ever held</div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Current streak</div>
             <div className="value">
               <StreakBadge streak={stats.streak} />
             </div>
+          </div>
+          <div className="stat-tile">
+            <div className="label">Best win streak</div>
+            <div className="value">W{stats.bestStreak}</div>
+            <div className="hint">longest run of consecutive wins</div>
           </div>
           <div className="stat-tile">
             <div className="label">Last played</div>
