@@ -263,8 +263,13 @@ export default function Tournaments() {
     await run(() => setTournamentStatus(t.id, completing ? "completed" : "active"));
   };
 
-  const deleteEmpty = async (t: TournamentSummary) => {
-    if (!confirm(`Delete "${t.name}"? (It has no matches, so nothing else is affected.)`)) return;
+  const deleteTournament = async (t: TournamentSummary) => {
+    const n = t.analysis.matches.length;
+    const q =
+      n === 0
+        ? `Delete "${t.name}"? (It has no matches, so nothing else is affected.)`
+        : `Delete "${t.name}"? Its ${n} ${n === 1 ? "match stays" : "matches stay"} in the match history and still count for ELO, but the bracket, champion record and trophy are removed. Re-creating a tournament with the exact same name brings them back.`;
+    if (!confirm(q)) return;
     await run(async () => {
       await removeTournament(t.id);
       setSelectedId(null);
@@ -380,11 +385,9 @@ export default function Tournaments() {
                 <button className="btn ghost" disabled={busy} onClick={() => toggleStatus(selected)}>
                   {selected.status === "active" ? "Mark as completed" : "Reopen tournament"}
                 </button>
-                {a.matches.length === 0 && (
-                  <button className="btn danger" disabled={busy} onClick={() => deleteEmpty(selected)}>
-                    Delete
-                  </button>
-                )}
+                <button className="btn danger" disabled={busy} onClick={() => deleteTournament(selected)}>
+                  Delete
+                </button>
               </div>
             )}
           </div>
