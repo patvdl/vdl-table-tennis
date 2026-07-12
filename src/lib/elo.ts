@@ -223,6 +223,105 @@ export interface HeadToHead {
   lastMeeting: string | null;
 }
 
+/* ---------- match prediction ----------
+ *
+ * The win predictor blends three signals:
+ * 1. Rating gap (classic ELO expected score) — the baseline.
+ * 2. Current form — each player's overall win/loss streak nudges their
+ *    effective rating up or down (capped so one hot run can't dominate).
+ * 3. Head-to-head record — the strongest signal. Meetings are weighted
+ *    so recent results count more than old ones, and the h2h evidence
+ *    is combined with the rating baseline as a Bayesian prior worth
+ *    PRIOR_STRENGTH pseudo-matches. With few meetings the rating edge
+ *    dominates; once a real rivalry history exists, it takes over.
+ */
+const H2H_DECAY = 0.9; // weight multiplier per match into the past
+const PRIOR_STRENGTH = 3; // rating prior worth this many h2h matches
+const FORM_POINTS = 6; // effective rating points per streak game
+const FORM_CAP = 5; // streak games counted at most
+
+export interface MatchPrediction {
+  /** Probability that player A wins the match */
+  pA: number;
+  /** Rating-only probability (no form, no h2h) */
+  pRating: number;
+  /** Rating + current form probability (the h2h prior) */
+  pElo: number;
+  h2hWinsA: number;
+  h2hWinsB: number;
+  streakA: number;
+  streakB: number;
+  /** Most likely best-of-5 scoreline, e.g. {a: 3, b: 1} */
+  sets: { a: number; b: number };
+}
+
+/**
+ * Predicted best-of-5 scoreline. A near coin-flip should read as a 3–2
+ * battle, a solid favourite takes it 3–1, and a heavy favourite sweeps.
+ */
+function predictSets(pA: number): { a: number; b: number } {
+  const winnerP = Math.max(pA, 1 - pA);
+  const loserSets = winnerP >= 0.8 ? 0 : winnerP >= 0.6 ? 1 : 2;
+  return pA >= 0.5 ? { a: 3, b: loserSets } : { a: loserSets, b: 3 };
+}
+
+export function predictMatch(
+  enriched: EnrichedMatch[],
+  stats: Map<string, PlayerStats>,
+  a: string,
+  b: string,
+): MatchPrediction {
+  const sa = stats.get(a);
+  const sb = stats.get(b);
+  const ra = sa?.rating ?? START_RATING;
+  const rb = sb?.rating ?? START_RATING;
+  const streakA = sa?.streak ?? 0;
+  const streakB = sb?.streak ?? 0;
+
+  const pRating = expectedScore(ra, rb);
+
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, v));
+  const formA = clamp(streakA, -FORM_CAP, FORM_CAP) * FORM_POINTS;
+  const formB = clamp(streakB, -FORM_CAP, FORM_CAP) * FORM_POINTS;
+  const pElo = expectedScore(ra + formA, rb + formB);
+
+  const between = enriched.filter(
+    (m) =>
+      (m.player1 === a && m.player2 === b) ||
+      (m.player1 === b && m.player2 === a),
+  );
+
+  let weightedA = 0;
+  let weightedTotal = 0;
+  let h2hWinsA = 0;
+  let h2hWinsB = 0;
+  for (let i = 0; i < between.length; i++) {
+    const m = between[between.length - 1 - i]; // i = matches into the past
+    const w = Math.pow(H2H_DECAY, i);
+    weightedTotal += w;
+    if (m.winnerName === a) {
+      weightedA += w;
+      h2hWinsA++;
+    } else {
+      h2hWinsB++;
+    }
+  }
+
+  const pA = (weightedA + PRIOR_STRENGTH * pElo) / (weightedTotal + PRIOR_STRENGTH);
+
+  return {
+    pA,
+    pRating,
+    pElo,
+    h2hWinsA,
+    h2hWinsB,
+    streakA,
+    streakB,
+    sets: predictSets(pA),
+  };
+}
+
 export function headToHead(enriched: EnrichedMatch[], a: string, b: string): HeadToHead {
   const between = enriched.filter(
     (m) =>

@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
-import { expectedScore } from "../lib/elo";
+import { predictMatch } from "../lib/elo";
 import { pct, round0 } from "../lib/format";
 
 function today(): string {
@@ -32,7 +32,8 @@ export default function AddMatch() {
     if (!name1 || !name2 || name1 === name2) return null;
     const r1 = replayResult.stats.get(name1)?.rating ?? 1000;
     const r2 = replayResult.stats.get(name2)?.rating ?? 1000;
-    return { r1, r2, e1: expectedScore(r1, r2) };
+    const p = predictMatch(replayResult.enriched, replayResult.stats, name1, name2);
+    return { r1, r2, p };
   }, [name1, name2, replayResult]);
 
   if (role !== "admin") {
@@ -158,12 +159,18 @@ export default function AddMatch() {
           </div>
           {preview && (
             <div>
-              <label className="field">Pre-match odds</label>
+              <label className="field">Pre-match prediction</label>
               <div className="stat-tile" style={{ padding: "9px 14px" }}>
                 <div style={{ fontSize: 13 }}>
-                  {name1} ({round0(preview.r1)}) — {pct(preview.e1)} expected
+                  {name1} ({round0(preview.r1)}) — {pct(preview.p.pA)} to win
                   <br />
-                  {name2} ({round0(preview.r2)}) — {pct(1 - preview.e1)} expected
+                  {name2} ({round0(preview.r2)}) — {pct(1 - preview.p.pA)} to win
+                  <br />
+                  <span style={{ color: "var(--text-dim)", fontSize: 12 }}>
+                    predicted: {preview.p.pA >= 0.5 ? name1 : name2} in{" "}
+                    {Math.max(preview.p.sets.a, preview.p.sets.b)}–
+                    {Math.min(preview.p.sets.a, preview.p.sets.b)} sets
+                  </span>
                 </div>
               </div>
             </div>

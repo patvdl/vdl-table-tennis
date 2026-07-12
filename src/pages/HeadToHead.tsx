@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { headToHead, expectedScore } from "../lib/elo";
+import { headToHead, predictMatch } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import H2HChart from "../components/H2HChart";
 
@@ -27,27 +27,43 @@ export default function HeadToHeadPage() {
 
   const pred = useMemo(() => {
     if (!a || !b || a === b) return null;
-    const ra = replayResult.stats.get(a)?.rating;
-    const rb = replayResult.stats.get(b)?.rating;
-    if (ra === undefined || rb === undefined) return null;
-    return { ra, rb, ea: expectedScore(ra, rb) };
+    if (!replayResult.stats.has(a) || !replayResult.stats.has(b)) return null;
+    return predictMatch(replayResult.enriched, replayResult.stats, a, b);
   }, [a, b, replayResult]);
+
+  const streakLabel = (s: number) =>
+    s === 0 ? "—" : s > 0 ? `W${s}` : `L${-s}`;
 
   const predictionBlock = pred && (
     <div style={{ marginTop: 18 }}>
       <label className="field">Win prediction — if they played today</label>
       <div className="pred-bar">
-        <div className="seg-a" style={{ width: `${pred.ea * 100}%` }} />
-        <div className="seg-b" style={{ width: `${(1 - pred.ea) * 100}%` }} />
+        <div className="seg-a" style={{ width: `${pred.pA * 100}%` }} />
+        <div className="seg-b" style={{ width: `${(1 - pred.pA) * 100}%` }} />
       </div>
       <div className="pred-legend">
         <span className="win-a">
-          {a} {pct(pred.ea)} <span className="pred-rating">· rating {round0(pred.ra)}</span>
+          {a} {pct(pred.pA)}
         </span>
         <span className="win-b">
-          <span className="pred-rating">rating {round0(pred.rb)} · </span>
-          {pct(1 - pred.ea)} {b}
+          {pct(1 - pred.pA)} {b}
         </span>
+      </div>
+      <div className="pred-verdict">
+        Predicted result:{" "}
+        <strong className={pred.pA >= 0.5 ? "win-a" : "win-b"}>
+          {pred.pA >= 0.5 ? a : b} wins{" "}
+          {Math.max(pred.sets.a, pred.sets.b)}–{Math.min(pred.sets.a, pred.sets.b)}
+        </strong>{" "}
+        (best of 5)
+      </div>
+      <div className="pred-detail">
+        rating edge: {pred.pRating >= 0.5 ? a : b}{" "}
+        {pct(Math.max(pred.pRating, 1 - pred.pRating))} · head-to-head:{" "}
+        {pred.h2hWinsA + pred.h2hWinsB === 0
+          ? "never met"
+          : `${pred.h2hWinsA >= pred.h2hWinsB ? a : b} leads ${Math.max(pred.h2hWinsA, pred.h2hWinsB)}–${Math.min(pred.h2hWinsA, pred.h2hWinsB)}`}{" "}
+        · form: {a} {streakLabel(pred.streakA)}, {b} {streakLabel(pred.streakB)}
       </div>
     </div>
   );

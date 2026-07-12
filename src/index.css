@@ -533,6 +533,17 @@ select:focus {
   font-size: 12px;
 }
 
+.pred-verdict {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.pred-detail {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* ---------- result pills in h2h timeline ---------- */
 .pill-row {
   display: flex;
