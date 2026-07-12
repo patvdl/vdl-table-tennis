@@ -10,6 +10,7 @@ export interface NewMatch {
   player2: string;
   winner: 1 | 2;
   score: string | null;
+  tournament: string | null;
 }
 
 export interface DataStore {
@@ -19,7 +20,7 @@ export interface DataStore {
   remove(id: string): Promise<void>;
 }
 
-type SeedRow = [string, string, string, number];
+type SeedRow = [string, string, string, number, (string | null)?, (string | null)?];
 
 function seedMatches(): Match[] {
   return (seedRaw as SeedRow[]).map((row, i) => ({
@@ -29,11 +30,12 @@ function seedMatches(): Match[] {
     player1: row[1],
     player2: row[2],
     winner: row[3] === 1 ? 1 : 2,
-    score: null,
+    score: row[4] ?? null,
+    tournament: row[5] ?? null,
   }));
 }
 
-const LOCAL_KEY = "vdl-tt-matches-v1";
+const LOCAL_KEY = "vdl-tt-matches-v2";
 
 const localStore: DataStore = {
   mode: "local",
@@ -69,7 +71,7 @@ function makeSupabaseStore(): DataStore {
     async load() {
       const { data, error } = await sb
         .from("matches")
-        .select("id, seq, date, player1, player2, winner, score")
+        .select("*")
         .order("seq", { ascending: true });
       if (error) throw new Error(error.message);
       return (data ?? []).map((r) => ({
@@ -80,6 +82,7 @@ function makeSupabaseStore(): DataStore {
         player2: String(r.player2),
         winner: Number(r.winner) === 1 ? 1 : 2,
         score: r.score ? String(r.score) : null,
+        tournament: r.tournament ? String(r.tournament) : null,
       }));
     },
     async add(m) {
@@ -89,6 +92,7 @@ function makeSupabaseStore(): DataStore {
         player2: m.player2,
         winner: m.winner,
         score: m.score,
+        tournament: m.tournament,
       });
       if (error) throw new Error(error.message);
     },

@@ -8,6 +8,8 @@ export interface Match {
   winner: 1 | 2;
   /** Optional score for records only — never affects ELO */
   score: string | null;
+  /** Tournament label (e.g. "Christmas 2024") for records only — never affects ELO */
+  tournament: string | null;
 }
 
 export interface PlayerStats {

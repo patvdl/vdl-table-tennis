@@ -6,6 +6,7 @@ import { formatDate, round0, pct } from "../lib/format";
 import type { PlayerStats } from "../types";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
+import Trophy from "../components/Trophy";
 
 type SortKey =
   | "name"
@@ -148,6 +149,7 @@ export default function Leaderboard() {
                     >
                       {p.name}
                     </Link>
+                    <Trophy player={p.name} />
                   </td>
                   <td className="num rating">{round0(p.rating)}</td>
                   <td className="num" style={{ color: "var(--text-dim)" }}>
@@ -208,6 +210,7 @@ export default function Leaderboard() {
                     >
                       {p.name}
                     </Link>
+                    <Trophy player={p.name} />
                   </td>
                   <td className="num">{p.played}</td>
                   <td className="num" style={{ color: "var(--green)" }}>

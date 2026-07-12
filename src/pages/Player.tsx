@@ -5,6 +5,8 @@ import { headToHead, RATED_MIN } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
+import Trophy from "../components/Trophy";
+import { titlesFor } from "../lib/tournaments";
 
 export default function PlayerPage() {
   const { name = "" } = useParams();
@@ -47,6 +49,7 @@ export default function PlayerPage() {
           ) : (
             <span className="badge neutral">Unrated</span>
           )}
+          <Trophy player={player} />
         </h2>
         <p className="sub">Full career profile</p>
         <div className="stat-grid">
@@ -127,6 +130,15 @@ export default function PlayerPage() {
               {formatDate(stats.lastPlayed)}
             </div>
           </div>
+          {titlesFor(player).length > 0 && (
+            <div className="stat-tile">
+              <div className="label">Tournament titles</div>
+              <div className="value">{titlesFor(player).length}</div>
+              <div className="hint">
+                {titlesFor(player).map((t) => t.name).join(" · ")}
+              </div>
+            </div>
+          )}
         </div>
         {isRated && (
           <div style={{ marginTop: 18 }}>

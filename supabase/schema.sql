@@ -11,6 +11,8 @@ create table if not exists public.matches (
   winner smallint not null check (winner in (1, 2)),
   -- score is for the record only; it never affects ratings
   score text,
+  -- tournament label (e.g. 'Christmas 2024'); record keeping only
+  tournament text,
   created_at timestamptz not null default now(),
   created_by uuid references auth.users (id)
 );

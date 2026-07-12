@@ -10,17 +10,18 @@ const rows = JSON.parse(
 );
 
 const esc = (s) => String(s).replaceAll("'", "''");
+const lit = (v) => (v == null ? "null" : `'${esc(v)}'`);
 
 const values = rows
   .map(
     (r, i) =>
-      `(${i + 1}, '${esc(r[0])}', '${esc(r[1])}', '${esc(r[2])}', ${r[3]}, null)`,
+      `(${i + 1}, '${esc(r[0])}', '${esc(r[1])}', '${esc(r[2])}', ${r[3]}, ${lit(r[4])}, ${lit(r[5])})`,
   )
   .join(",\n");
 
 const sql = `-- Auto-generated from src/data/seed-matches.json — do not edit by hand.
 -- Loads the historical match log into Supabase. Safe to run once on an empty table.
-insert into public.matches (seq, date, player1, player2, winner, score)
+insert into public.matches (seq, date, player1, player2, winner, score, tournament)
 values
 ${values}
 on conflict (seq) do nothing;

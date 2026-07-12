@@ -22,6 +22,7 @@ export default function AddMatch() {
   const [newP2, setNewP2] = useState("");
   const [winner, setWinner] = useState<1 | 2>(1);
   const [score, setScore] = useState("");
+  const [tournament, setTournament] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -64,6 +65,7 @@ export default function AddMatch() {
         player2: name2,
         winner,
         score: score.trim() || null,
+        tournament: tournament.trim() || null,
       });
       setMsg({
         kind: "ok",
@@ -117,6 +119,19 @@ export default function AddMatch() {
               onChange={(e) => setScore(e.target.value)}
             />
           </div>
+        </div>
+
+        <div className="form-row">
+          <div>
+            <label className="field">Tournament (optional, record only)</label>
+            <input
+              type="text"
+              placeholder="e.g. Christmas 2026"
+              value={tournament}
+              onChange={(e) => setTournament(e.target.value)}
+            />
+          </div>
+          <div />
         </div>
 
         <div className="form-row">

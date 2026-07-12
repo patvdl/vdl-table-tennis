@@ -231,7 +231,14 @@ export default function HeadToHeadPage() {
                             {m.winnerName}
                           </span>
                         </td>
-                        <td style={{ color: "var(--text-dim)" }}>{m.score ?? "—"}</td>
+                        <td style={{ color: "var(--text-dim)" }}>
+                          {m.score ?? "—"}
+                          {m.tournament && (
+                            <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
+                              🏆 {m.tournament}
+                            </span>
+                          )}
+                        </td>
                         <td className="num delta-up">{signed(Math.abs(m.delta))}</td>
                         <td className="num rating">{round0(aAfter)}</td>
                         <td className="num rating">{round0(bAfter)}</td>
