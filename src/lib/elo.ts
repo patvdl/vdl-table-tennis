@@ -17,12 +17,20 @@ export const START_RATING = 1000;
  *   sink a player to the bottom of the table, and the farmer can't
  *   climb forever off one matchup. The moment the underdog wins, the
  *   damping resets and the upset pays out in full.
+ * - Unrated players: someone with fewer than RATED_MIN completed
+ *   matches doesn't appear in the rankings and doesn't move anyone
+ *   else's rating yet. Their own rating still calibrates from those
+ *   first matches (so they debut at a fair level), and every result is
+ *   recorded for head-to-head and win/loss records as normal.
  */
 const K_PROVISIONAL = 40; // player's first matches
 const K_STANDARD = 24;
 const PROVISIONAL_GAMES = 10;
 const STREAK_DAMP = 0.85; // per consecutive win vs the same opponent
 const STREAK_DAMP_FLOOR = 0.2;
+
+/** Matches a player must complete before they are ranked/rated */
+export const RATED_MIN = 3;
 
 export function expectedScore(ratingA: number, ratingB: number): number {
   return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
@@ -99,8 +107,14 @@ export function replay(matches: Match[]): ReplayResult {
     const priorWins = ps && ps.holder === winnerName ? ps.count : 0;
     const damp = streakDamp(priorWins);
 
-    const r1After = p1.rating + k1 * (s1 - e1) * damp;
-    const r2After = p2.rating + k2 * (1 - s1 - (1 - e1)) * damp;
+    // A rating only moves when the opponent is rated (RATED_MIN+ matches
+    // completed). Unrated newcomers can't shift anyone else's rating, but
+    // their own rating still calibrates against rated opponents.
+    const p1Moves = p2.played >= RATED_MIN;
+    const p2Moves = p1.played >= RATED_MIN;
+
+    const r1After = p1Moves ? p1.rating + k1 * (s1 - e1) * damp : p1.rating;
+    const r2After = p2Moves ? p2.rating + k2 * (1 - s1 - (1 - e1)) * damp : p2.rating;
 
     enriched.push({
       ...m,
@@ -162,7 +176,10 @@ export function replay(matches: Match[]): ReplayResult {
 
     // Track career-high ranking: standings can shift for everyone after
     // any match, so re-rank all debuted players (tiny N, cost is trivial).
-    const ranked = [...stats.values()].sort((a, b) => b.rating - a.rating);
+    // Only rated players (RATED_MIN+ matches) occupy ranking spots.
+    const ranked = [...stats.values()]
+      .filter((p) => p.played >= RATED_MIN)
+      .sort((a, b) => b.rating - a.rating);
     for (let i = 0; i < ranked.length; i++) {
       if (i + 1 < ranked[i].bestRank) {
         ranked[i].bestRank = i + 1;
@@ -174,8 +191,18 @@ export function replay(matches: Match[]): ReplayResult {
   return { stats, enriched };
 }
 
+/** Ranked players only — needs RATED_MIN completed matches to appear. */
 export function leaderboard(stats: Map<string, PlayerStats>): PlayerStats[] {
-  return [...stats.values()].sort((a, b) => b.rating - a.rating);
+  return [...stats.values()]
+    .filter((p) => p.played >= RATED_MIN)
+    .sort((a, b) => b.rating - a.rating);
+}
+
+/** Players still working toward their first ranking. */
+export function unratedPlayers(stats: Map<string, PlayerStats>): PlayerStats[] {
+  return [...stats.values()]
+    .filter((p) => p.played < RATED_MIN)
+    .sort((a, b) => b.played - a.played || a.name.localeCompare(b.name));
 }
 
 export interface HeadToHead {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
+import { RATED_MIN } from "../lib/elo";
 import { formatDate, round0, pct } from "../lib/format";
 import type { PlayerStats } from "../types";
 import Sparkline from "../components/Sparkline";
@@ -53,7 +54,7 @@ function sortValue(p: PlayerStats, key: SortKey): string | number {
 }
 
 export default function Leaderboard() {
-  const { board, matches } = useMatches();
+  const { board, unratedBoard, matches } = useMatches();
   const [sortKey, setSortKey] = useState<SortKey>("rating");
   const [dir, setDir] = useState<1 | -1>(-1);
 
@@ -110,11 +111,12 @@ export default function Leaderboard() {
   );
 
   return (
+    <>
     <div className="card">
       <h2>Leaderboard</h2>
       <p className="sub">
-        {board.length} players · {matches.length} matches recorded · click a column
-        to sort
+        {board.length} ranked players · {matches.length} matches recorded · click a
+        column to sort
       </p>
       <div className="table-wrap">
         <table>
@@ -175,5 +177,61 @@ export default function Leaderboard() {
         </table>
       </div>
     </div>
+
+    {unratedBoard.length > 0 && (
+      <div className="card">
+        <h2>Unrated players</h2>
+        <p className="sub">
+          Everyone joins the rankings after {RATED_MIN} matches. Results here are
+          recorded (and count in head-to-heads), but don't earn a rating yet.
+        </p>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th className="num">Played</th>
+                <th className="num">W</th>
+                <th className="num">L</th>
+                <th className="num">Win %</th>
+                <th>Until ranked</th>
+                <th>Last played</th>
+              </tr>
+            </thead>
+            <tbody>
+              {unratedBoard.map((p) => (
+                <tr key={p.name}>
+                  <td>
+                    <Link
+                      className="player-link"
+                      to={`/player/${encodeURIComponent(p.name)}`}
+                    >
+                      {p.name}
+                    </Link>
+                  </td>
+                  <td className="num">{p.played}</td>
+                  <td className="num" style={{ color: "var(--green)" }}>
+                    {p.wins}
+                  </td>
+                  <td className="num" style={{ color: "var(--red)" }}>
+                    {p.losses}
+                  </td>
+                  <td className="num">{p.played ? pct(p.wins / p.played) : "—"}</td>
+                  <td>
+                    <span className="badge neutral">
+                      {RATED_MIN - p.played} more {RATED_MIN - p.played === 1 ? "match" : "matches"}
+                    </span>
+                  </td>
+                  <td style={{ color: "var(--text-dim)" }}>
+                    {formatDate(p.lastPlayed)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

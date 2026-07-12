@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { headToHead } from "../lib/elo";
+import { headToHead, RATED_MIN } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
@@ -35,25 +35,50 @@ export default function PlayerPage() {
     );
   }
 
+  const isRated = stats.played >= RATED_MIN;
+
   return (
     <>
       <div className="card">
         <h2>
           {player}{" "}
-          <span className={`badge ${rank === 1 ? "gold" : "neutral"}`}>#{rank}</span>
+          {isRated ? (
+            <span className={`badge ${rank === 1 ? "gold" : "neutral"}`}>#{rank}</span>
+          ) : (
+            <span className="badge neutral">Unrated</span>
+          )}
         </h2>
         <p className="sub">Full career profile</p>
         <div className="stat-grid">
           <div className="stat-tile">
             <div className="label">Rating</div>
-            <div className="value">{round0(stats.rating)}</div>
+            {isRated ? (
+              <div className="value">{round0(stats.rating)}</div>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">
+                  ranked after {RATED_MIN - stats.played} more{" "}
+                  {RATED_MIN - stats.played === 1 ? "match" : "matches"}
+                </div>
+              </>
+            )}
           </div>
           <div className="stat-tile">
             <div className="label">Peak rating</div>
-            <div className="value">{round0(stats.peakRating)}</div>
-            <div className="hint">
-              {stats.peakDate ? `reached ${formatDate(stats.peakDate)}` : "at start rating"}
-            </div>
+            {isRated ? (
+              <>
+                <div className="value">{round0(stats.peakRating)}</div>
+                <div className="hint">
+                  {stats.peakDate ? `reached ${formatDate(stats.peakDate)}` : "at start rating"}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">unrated</div>
+              </>
+            )}
           </div>
           <div className="stat-tile">
             <div className="label">Record</div>
@@ -65,8 +90,17 @@ export default function PlayerPage() {
           </div>
           <div className="stat-tile">
             <div className="label">Career-high rank</div>
-            <div className="value">#{stats.bestRank}</div>
-            <div className="hint">reached {formatDate(stats.bestRankDate)}</div>
+            {stats.bestRankDate ? (
+              <>
+                <div className="value">#{stats.bestRank}</div>
+                <div className="hint">reached {formatDate(stats.bestRankDate)}</div>
+              </>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">not ranked yet</div>
+              </>
+            )}
           </div>
           <div className="stat-tile">
             <div className="label">Current streak</div>
@@ -94,10 +128,12 @@ export default function PlayerPage() {
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 18 }}>
-          <label className="field">Rating over time ({stats.played} matches)</label>
-          <Sparkline values={stats.history} width={640} height={80} />
-        </div>
+        {isRated && (
+          <div style={{ marginTop: 18 }}>
+            <label className="field">Rating over time ({stats.played} matches)</label>
+            <Sparkline values={stats.history} width={640} height={80} />
+          </div>
+        )}
       </div>
 
       <div className="card">

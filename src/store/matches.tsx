@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { store, type NewMatch } from "./store";
-import { replay, leaderboard, type ReplayResult } from "../lib/elo";
+import { replay, leaderboard, unratedPlayers, type ReplayResult } from "../lib/elo";
 import type { Match, PlayerStats } from "../types";
 
 interface MatchesState {
@@ -17,6 +17,8 @@ interface MatchesState {
   matches: Match[];
   replayResult: ReplayResult;
   board: PlayerStats[];
+  /** Players with fewer than RATED_MIN matches — recorded but not ranked */
+  unratedBoard: PlayerStats[];
   playerNames: string[];
   addMatch(m: NewMatch): Promise<void>;
   removeMatch(id: string): Promise<void>;
@@ -47,6 +49,10 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
 
   const replayResult = useMemo(() => replay(matches), [matches]);
   const board = useMemo(() => leaderboard(replayResult.stats), [replayResult]);
+  const unratedBoard = useMemo(
+    () => unratedPlayers(replayResult.stats),
+    [replayResult],
+  );
   const playerNames = useMemo(
     () => [...replayResult.stats.keys()].sort((a, b) => a.localeCompare(b)),
     [replayResult],
@@ -58,6 +64,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     matches,
     replayResult,
     board,
+    unratedBoard,
     playerNames,
     async addMatch(m) {
       await store.add(m);
