@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { headToHead } from "../lib/elo";
+import { headToHead, expectedScore } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
+import H2HChart from "../components/H2HChart";
 
 export default function HeadToHeadPage() {
   const { playerNames, replayResult } = useMatches();
@@ -23,6 +24,33 @@ export default function HeadToHeadPage() {
     if (!a || !b || a === b) return null;
     return headToHead(replayResult.enriched, a, b);
   }, [a, b, replayResult]);
+
+  const pred = useMemo(() => {
+    if (!a || !b || a === b) return null;
+    const ra = replayResult.stats.get(a)?.rating;
+    const rb = replayResult.stats.get(b)?.rating;
+    if (ra === undefined || rb === undefined) return null;
+    return { ra, rb, ea: expectedScore(ra, rb) };
+  }, [a, b, replayResult]);
+
+  const predictionBlock = pred && (
+    <div style={{ marginTop: 18 }}>
+      <label className="field">Win prediction — if they played today</label>
+      <div className="pred-bar">
+        <div className="seg-a" style={{ width: `${pred.ea * 100}%` }} />
+        <div className="seg-b" style={{ width: `${(1 - pred.ea) * 100}%` }} />
+      </div>
+      <div className="pred-legend">
+        <span className="win-a">
+          {a} {pct(pred.ea)} <span className="pred-rating">· rating {round0(pred.ra)}</span>
+        </span>
+        <span className="win-b">
+          <span className="pred-rating">rating {round0(pred.rb)} · </span>
+          {pct(1 - pred.ea)} {b}
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -60,6 +88,7 @@ export default function HeadToHeadPage() {
           <p className="sub" style={{ margin: 0 }}>
             {a} and {b} haven't played each other yet.
           </p>
+          {predictionBlock}
         </div>
       )}
 
@@ -121,10 +150,12 @@ export default function HeadToHeadPage() {
               </div>
             </div>
 
+            {predictionBlock}
+
             <div style={{ marginTop: 18 }}>
-              <label className="field">Results timeline (oldest → newest)</label>
+              <label className="field">Results timeline (newest → oldest)</label>
               <div className="pill-row">
-                {h2h.matches.map((m) => (
+                {[...h2h.matches].reverse().map((m) => (
                   <span
                     key={m.id}
                     className={`pill ${m.winnerName === h2h.a ? "a" : "b"}`}
@@ -135,6 +166,16 @@ export default function HeadToHeadPage() {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="card">
+            <h2>Rivalry graph</h2>
+            <p className="sub">
+              The running lead across all {h2h.total} meetings — when the line is above
+              zero <span className="win-a">{h2h.a}</span> is in front, below it{" "}
+              <span className="win-b">{h2h.b}</span> is. Hover a dot for that match.
+            </p>
+            <H2HChart matches={h2h.matches} a={h2h.a} b={h2h.b} />
           </div>
 
           <div className="card">

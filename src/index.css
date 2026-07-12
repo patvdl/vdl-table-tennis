@@ -499,6 +499,40 @@ select:focus {
   color: var(--text-dim);
 }
 
+/* ---------- h2h win prediction bar ---------- */
+.pred-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.pred-bar .seg-a {
+  background: linear-gradient(90deg, #4ade80cc, #4ade8099);
+}
+
+.pred-bar .seg-b {
+  background: linear-gradient(90deg, #60a5fa99, #60a5facc);
+}
+
+.pred-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pred-legend .pred-rating {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 12px;
+}
+
 /* ---------- result pills in h2h timeline ---------- */
 .pill-row {
   display: flex;
