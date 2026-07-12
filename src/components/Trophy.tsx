@@ -1,11 +1,14 @@
-import { titlesFor, isDefendingChampion } from "../lib/tournaments";
+import { useMatches } from "../store/matches";
 
 /** Small trophy icon: gold for the defending champion, grey for past champions. */
 export default function Trophy({ player }: { player: string }) {
-  const titles = titlesFor(player);
+  const { tournaments } = useMatches();
+  // Newest first; only completed tournaments have a champion
+  const decided = tournaments.filter((t) => t.champion);
+  const titles = decided.filter((t) => t.champion === player);
   if (titles.length === 0) return null;
 
-  const defending = isDefendingChampion(player);
+  const defending = decided[0]?.champion === player;
   const color = defending ? "var(--gold)" : "var(--text-dim)";
   const label = defending
     ? `Defending champion — ${titles[0].name}${titles.length > 1 ? ` (also won: ${titles.slice(1).map((t) => t.name).join(", ")})` : ""}`

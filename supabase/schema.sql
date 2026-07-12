@@ -19,6 +19,22 @@ create table if not exists public.matches (
 
 create unique index if not exists matches_seq_idx on public.matches (seq);
 
+-- ============ tournaments ============
+create table if not exists public.tournaments (
+  id uuid primary key default gen_random_uuid(),
+  -- must match the tournament label stored on matches
+  name text not null unique,
+  date date not null,
+  -- 'active' tournaments appear in the Add Match dropdown; mark 'completed' when done
+  status text not null default 'active' check (status in ('active', 'completed')),
+  created_at timestamptz not null default now()
+);
+
+insert into public.tournaments (name, date, status) values
+  ('Christmas 2024', '2024-12-25', 'completed'),
+  ('Christmas 2025', '2025-12-25', 'completed')
+on conflict (name) do nothing;
+
 -- ============ profiles (roles) ============
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -60,6 +76,28 @@ $$;
 -- ============ row level security ============
 alter table public.matches enable row level security;
 alter table public.profiles enable row level security;
+alter table public.tournaments enable row level security;
+
+-- Everyone can read tournaments; only admins can manage them
+drop policy if exists "tournaments are public to read" on public.tournaments;
+create policy "tournaments are public to read"
+  on public.tournaments for select
+  using (true);
+
+drop policy if exists "admins can insert tournaments" on public.tournaments;
+create policy "admins can insert tournaments"
+  on public.tournaments for insert
+  with check (public.is_admin());
+
+drop policy if exists "admins can update tournaments" on public.tournaments;
+create policy "admins can update tournaments"
+  on public.tournaments for update
+  using (public.is_admin());
+
+drop policy if exists "admins can delete tournaments" on public.tournaments;
+create policy "admins can delete tournaments"
+  on public.tournaments for delete
+  using (public.is_admin());
 
 -- Everyone (including anonymous visitors) can read matches
 drop policy if exists "matches are public to read" on public.matches;

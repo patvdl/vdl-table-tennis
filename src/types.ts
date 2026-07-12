@@ -51,3 +51,12 @@ export interface EnrichedMatch extends Match {
 }
 
 export type Role = "anon" | "viewer" | "admin";
+
+export interface Tournament {
+  id: string;
+  /** Label carried by this tournament's matches, e.g. "Christmas 2024" */
+  name: string;
+  date: string; // ISO yyyy-mm-dd
+  /** Active tournaments accept new matches; completed ones show the final bracket */
+  status: "active" | "completed";
+}

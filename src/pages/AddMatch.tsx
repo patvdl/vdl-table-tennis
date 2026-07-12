@@ -12,8 +12,9 @@ function today(): string {
 }
 
 export default function AddMatch() {
-  const { playerNames, replayResult, addMatch } = useMatches();
+  const { playerNames, replayResult, addMatch, tournaments } = useMatches();
   const { role } = useAuth();
+  const activeTournaments = tournaments.filter((t) => t.status === "active");
 
   const [date, setDate] = useState(today());
   const [p1, setP1] = useState("");
@@ -123,13 +124,21 @@ export default function AddMatch() {
 
         <div className="form-row">
           <div>
-            <label className="field">Tournament (optional, record only)</label>
-            <input
-              type="text"
-              placeholder="e.g. Christmas 2026"
-              value={tournament}
-              onChange={(e) => setTournament(e.target.value)}
-            />
+            <label className="field">Tournament (optional)</label>
+            <select value={tournament} onChange={(e) => setTournament(e.target.value)}>
+              <option value="">None — regular match</option>
+              {activeTournaments.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            {activeTournaments.length === 0 && (
+              <p className="sub" style={{ marginTop: 6, fontSize: 12 }}>
+                No active tournament. Create one from the Tournaments tab to record tournament
+                matches.
+              </p>
+            )}
           </div>
           <div />
         </div>

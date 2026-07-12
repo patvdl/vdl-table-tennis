@@ -6,12 +6,12 @@ import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
-import { titlesFor } from "../lib/tournaments";
 
 export default function PlayerPage() {
   const { name = "" } = useParams();
   const player = decodeURIComponent(name);
-  const { board, replayResult } = useMatches();
+  const { board, replayResult, tournaments } = useMatches();
+  const titles = tournaments.filter((t) => t.champion === player);
 
   const stats = replayResult.stats.get(player);
   const rank = board.findIndex((p) => p.name === player) + 1;
@@ -130,13 +130,11 @@ export default function PlayerPage() {
               {formatDate(stats.lastPlayed)}
             </div>
           </div>
-          {titlesFor(player).length > 0 && (
+          {titles.length > 0 && (
             <div className="stat-tile">
               <div className="label">Tournament titles</div>
-              <div className="value">{titlesFor(player).length}</div>
-              <div className="hint">
-                {titlesFor(player).map((t) => t.name).join(" · ")}
-              </div>
+              <div className="value">{titles.length}</div>
+              <div className="hint">{titles.map((t) => t.name).join(" · ")}</div>
             </div>
           )}
         </div>
