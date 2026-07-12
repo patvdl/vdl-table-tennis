@@ -59,4 +59,11 @@ export interface Tournament {
   date: string; // ISO yyyy-mm-dd
   /** Active tournaments accept new matches; completed ones show the final bracket */
   status: "active" | "completed";
+  /**
+   * Optional pre-planned draw: first-round slots in bracket order (power of 2).
+   * Slots 0&1 meet in round 1, slots 2&3, etc. null = bye. When set, the
+   * bracket displays up-front and fills in as results are recorded.
+   * When null, the bracket is derived from match history after completion.
+   */
+  bracket: (string | null)[] | null;
 }

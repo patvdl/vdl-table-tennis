@@ -5,8 +5,8 @@ import seedRaw from "../data/seed-matches.json";
 export type StoreMode = "supabase" | "local";
 
 const SEED_TOURNAMENTS: Tournament[] = [
-  { id: "seed-t-1", name: "Christmas 2024", date: "2024-12-25", status: "completed" },
-  { id: "seed-t-2", name: "Christmas 2025", date: "2025-12-25", status: "completed" },
+  { id: "seed-t-1", name: "Christmas 2024", date: "2024-12-25", status: "completed", bracket: null },
+  { id: "seed-t-2", name: "Christmas 2025", date: "2025-12-25", status: "completed", bracket: null },
 ];
 
 export interface NewMatch {
@@ -26,6 +26,7 @@ export interface DataStore {
   loadTournaments(): Promise<Tournament[]>;
   addTournament(name: string, date: string): Promise<void>;
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
+  setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
   removeTournament(id: string): Promise<void>;
 }
 
@@ -76,7 +77,8 @@ const localStore: DataStore = {
     const raw = localStorage.getItem(LOCAL_T_KEY);
     if (raw) {
       try {
-        return JSON.parse(raw) as Tournament[];
+        const rows = JSON.parse(raw) as Tournament[];
+        return rows.map((t) => ({ ...t, bracket: t.bracket ?? null }));
       } catch {
         // fall through to reseed
       }
@@ -87,12 +89,18 @@ const localStore: DataStore = {
   async addTournament(name, date) {
     const all = await this.loadTournaments();
     if (all.some((t) => t.name === name)) throw new Error("A tournament with that name already exists.");
-    all.push({ id: crypto.randomUUID(), name, date, status: "active" });
+    all.push({ id: crypto.randomUUID(), name, date, status: "active", bracket: null });
     localStorage.setItem(LOCAL_T_KEY, JSON.stringify(all));
   },
   async setTournamentStatus(id, status) {
     const all = (await this.loadTournaments()).map((t) =>
       t.id === id ? { ...t, status } : t,
+    );
+    localStorage.setItem(LOCAL_T_KEY, JSON.stringify(all));
+  },
+  async setTournamentBracket(id, bracket) {
+    const all = (await this.loadTournaments()).map((t) =>
+      t.id === id ? { ...t, bracket } : t,
     );
     localStorage.setItem(LOCAL_T_KEY, JSON.stringify(all));
   },
@@ -149,6 +157,7 @@ function makeSupabaseStore(): DataStore {
         name: String(r.name),
         date: String(r.date),
         status: r.status === "completed" ? ("completed" as const) : ("active" as const),
+        bracket: Array.isArray(r.bracket) ? (r.bracket as (string | null)[]) : null,
       }));
     },
     async addTournament(name, date) {
@@ -157,6 +166,10 @@ function makeSupabaseStore(): DataStore {
     },
     async setTournamentStatus(id, status) {
       const { error } = await sb.from("tournaments").update({ status }).eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    async setTournamentBracket(id, bracket) {
+      const { error } = await sb.from("tournaments").update({ bracket }).eq("id", id);
       if (error) throw new Error(error.message);
     },
     async removeTournament(id) {

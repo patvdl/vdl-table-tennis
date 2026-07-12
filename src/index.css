@@ -683,6 +683,11 @@ select:focus {
   background: var(--border);
 }
 
+/* single feeder (e.g. bye pass-through): straight line, no elbow */
+.bk-feed:only-child::after {
+  display: none;
+}
+
 .bk-match-wrap {
   position: relative;
 }
@@ -742,6 +747,12 @@ select:focus {
   color: var(--text-dim);
 }
 
+.bk-tbd {
+  color: var(--text-dim);
+  font-style: italic;
+  opacity: 0.7;
+}
+
 .bk-check {
   color: var(--green);
   font-size: 11px;
@@ -760,6 +771,37 @@ select:focus {
   display: flex;
   justify-content: center;
   margin-top: 10px;
+}
+
+/* ---------- tournaments: bracket editor ---------- */
+.draw-editor {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.draw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.draw-pair {
+  padding: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.draw-pair-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
 }
 
 .bracket-third .bk-match {

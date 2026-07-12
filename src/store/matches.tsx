@@ -33,6 +33,7 @@ interface MatchesState {
   removeMatch(id: string): Promise<void>;
   addTournament(name: string, date: string): Promise<void>;
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
+  setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
   removeTournament(id: string): Promise<void>;
   refresh(): Promise<void>;
 }
@@ -84,6 +85,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
         .map((t) => {
           const analysis = analyzeTournament(
             replayResult.enriched.filter((m) => m.tournament === t.name),
+            t.bracket,
           );
           return {
             ...t,
@@ -117,6 +119,10 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     },
     async setTournamentStatus(id, status) {
       await store.setTournamentStatus(id, status);
+      await refresh();
+    },
+    async setTournamentBracket(id, bracket) {
+      await store.setTournamentBracket(id, bracket);
       await refresh();
     },
     async removeTournament(id) {

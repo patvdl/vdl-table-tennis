@@ -27,6 +27,8 @@ create table if not exists public.tournaments (
   date date not null,
   -- 'active' tournaments appear in the Add Match dropdown; mark 'completed' when done
   status text not null default 'active' check (status in ('active', 'completed')),
+  -- planned draw: first-round slots in bracket order (JSON array, null entries = byes)
+  bracket jsonb,
   created_at timestamptz not null default now()
 );
 
