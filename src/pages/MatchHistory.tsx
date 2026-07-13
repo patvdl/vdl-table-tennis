@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
-import { formatDate, round0, signed } from "../lib/format";
+import { formatDate, round0 } from "../lib/format";
+import Delta from "../components/Delta";
 
 const PAGE = 50;
 
@@ -71,6 +72,14 @@ export default function MatchHistory() {
             {rows.slice(0, shown).map((m) => {
               const winnerAfter = m.winner === 1 ? m.rating1After : m.rating2After;
               const loserAfter = m.winner === 1 ? m.rating2After : m.rating1After;
+              const winnerDelta =
+                m.winner === 1
+                  ? m.rating1After - m.rating1Before
+                  : m.rating2After - m.rating2Before;
+              const loserDelta =
+                m.winner === 1
+                  ? m.rating2After - m.rating2Before
+                  : m.rating1After - m.rating1Before;
               return (
                 <tr key={m.id}>
                   <td className="num" style={{ color: "var(--text-dim)" }}>
@@ -95,7 +104,11 @@ export default function MatchHistory() {
                       </span>
                     )}
                   </td>
-                  <td className="num delta-up">{signed(Math.abs(m.delta))}</td>
+                  <td className="num" style={{ whiteSpace: "nowrap" }}>
+                    <Delta value={winnerDelta} />
+                    <span style={{ color: "var(--text-dim)" }}> / </span>
+                    <Delta value={loserDelta} />
+                  </td>
                   <td className="num rating">{round0(winnerAfter)}</td>
                   <td className="num rating">{round0(loserAfter)}</td>
                   {role === "admin" && (

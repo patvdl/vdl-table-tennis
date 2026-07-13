@@ -1,12 +1,19 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { RATED_MIN } from "../lib/elo";
+import { RATED_MIN, replay, leaderboard, unratedPlayers } from "../lib/elo";
 import { formatDate, round0, pct } from "../lib/format";
 import type { PlayerStats } from "../types";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
+
+function todayISO(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
 
 type SortKey =
   | "name"
@@ -58,16 +65,38 @@ export default function Leaderboard() {
   const { board, unratedBoard, matches } = useMatches();
   const [sortKey, setSortKey] = useState<SortKey>("rating");
   const [dir, setDir] = useState<1 | -1>(-1);
+  const [asOf, setAsOf] = useState(""); // "" = today (live board)
+
+  const today = todayISO();
+  const firstDate = useMemo(
+    () => matches.reduce((min, m) => (m.date < min ? m.date : min), today),
+    [matches, today],
+  );
+
+  // Time machine: replay only the matches played on/before the chosen date
+  const view = useMemo(() => {
+    if (!asOf || asOf >= today)
+      return { board, unratedBoard, matchCount: matches.length };
+    const subset = matches.filter((m) => m.date <= asOf);
+    const rr = replay(subset);
+    return {
+      board: leaderboard(rr.stats),
+      unratedBoard: unratedPlayers(rr.stats),
+      matchCount: subset.length,
+    };
+  }, [asOf, today, matches, board, unratedBoard]);
+
+  const timeTravelling = Boolean(asOf) && asOf < today;
 
   // Rank is always rating-based, regardless of the active sort
   const ratingRank = useMemo(() => {
     const m = new Map<string, number>();
-    board.forEach((p, i) => m.set(p.name, i + 1));
+    view.board.forEach((p, i) => m.set(p.name, i + 1));
     return m;
-  }, [board]);
+  }, [view.board]);
 
   const sorted = useMemo(() => {
-    const arr = [...board];
+    const arr = [...view.board];
     arr.sort((a, b) => {
       const va = sortValue(a, sortKey);
       const vb = sortValue(b, sortKey);
@@ -79,7 +108,7 @@ export default function Leaderboard() {
       return dir * cmp || b.rating - a.rating;
     });
     return arr;
-  }, [board, sortKey, dir]);
+  }, [view.board, sortKey, dir]);
 
   const onSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -116,9 +145,42 @@ export default function Leaderboard() {
     <div className="card">
       <h2>Leaderboard</h2>
       <p className="sub">
-        {board.length} ranked players · {matches.length} matches recorded · click a
-        column to sort
+        {timeTravelling
+          ? `The rankings as they stood on ${formatDate(asOf)} · ${view.matchCount} matches played by then`
+          : `${view.board.length} ranked players · ${view.matchCount} matches recorded · click a column to sort`}
       </p>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ maxWidth: 220 }}>
+          <label className="field">View rankings on date</label>
+          <input
+            type="date"
+            value={asOf || today}
+            min={firstDate}
+            max={today}
+            onChange={(e) => setAsOf(e.target.value)}
+          />
+        </div>
+        {timeTravelling && (
+          <button className="btn ghost" onClick={() => setAsOf("")}>
+            Back to today
+          </button>
+        )}
+      </div>
+
+      {view.board.length === 0 ? (
+        <p className="sub" style={{ margin: 0 }}>
+          No ranked players yet on this date — nobody had played {RATED_MIN} matches.
+        </p>
+      ) : (
       <div className="table-wrap">
         <table>
           <thead>
@@ -149,7 +211,7 @@ export default function Leaderboard() {
                     >
                       {p.name}
                     </Link>
-                    <Trophy player={p.name} />
+                    <Trophy player={p.name} asOf={timeTravelling ? asOf : undefined} />
                   </td>
                   <td className="num rating">{round0(p.rating)}</td>
                   <td className="num" style={{ color: "var(--text-dim)" }}>
@@ -178,9 +240,10 @@ export default function Leaderboard() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
 
-    {unratedBoard.length > 0 && (
+    {view.unratedBoard.length > 0 && (
       <div className="card">
         <h2>Unrated players</h2>
         <p className="sub">
@@ -201,7 +264,7 @@ export default function Leaderboard() {
               </tr>
             </thead>
             <tbody>
-              {unratedBoard.map((p) => (
+              {view.unratedBoard.map((p) => (
                 <tr key={p.name}>
                   <td>
                     <Link
@@ -210,7 +273,7 @@ export default function Leaderboard() {
                     >
                       {p.name}
                     </Link>
-                    <Trophy player={p.name} />
+                    <Trophy player={p.name} asOf={timeTravelling ? asOf : undefined} />
                   </td>
                   <td className="num">{p.played}</td>
                   <td className="num" style={{ color: "var(--green)" }}>

@@ -1,10 +1,16 @@
 import { useMatches } from "../store/matches";
 
-/** Small trophy icon: gold for the defending champion, grey for past champions. */
-export default function Trophy({ player }: { player: string }) {
+/**
+ * Small trophy icon: gold for the defending champion, grey for past champions.
+ * Pass `asOf` (YYYY-MM-DD) to only count tournaments decided by that date,
+ * e.g. for the leaderboard time machine.
+ */
+export default function Trophy({ player, asOf }: { player: string; asOf?: string }) {
   const { tournaments } = useMatches();
   // Newest first; only completed tournaments have a champion
-  const decided = tournaments.filter((t) => t.champion);
+  const decided = tournaments.filter(
+    (t) => t.champion && (!asOf || t.date <= asOf),
+  );
   const titles = decided.filter((t) => t.champion === player);
   if (titles.length === 0) return null;
 

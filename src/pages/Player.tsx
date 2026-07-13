@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { headToHead, RATED_MIN, START_RATING } from "../lib/elo";
@@ -6,6 +6,9 @@ import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
+import Delta from "../components/Delta";
+
+const RECENT = 5;
 
 export default function PlayerPage() {
   const { name = "" } = useParams();
@@ -15,6 +18,15 @@ export default function PlayerPage() {
 
   const stats = replayResult.stats.get(player);
   const rank = board.findIndex((p) => p.name === player) + 1;
+  const [showAllMatches, setShowAllMatches] = useState(false);
+
+  const myMatches = useMemo(
+    () =>
+      [...replayResult.enriched]
+        .reverse() // newest first
+        .filter((m) => m.player1 === player || m.player2 === player),
+    [player, replayResult],
+  );
 
   const rivals = useMemo(() => {
     if (!stats) return [];
@@ -144,6 +156,82 @@ export default function PlayerPage() {
           <div style={{ marginTop: 18 }}>
             <label className="field">Rating over time ({stats.played} matches)</label>
             <Sparkline values={stats.history} width={640} height={80} />
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Match history</h2>
+        <p className="sub">
+          {showAllMatches || myMatches.length <= RECENT
+            ? `All ${myMatches.length} of ${player}'s matches, newest first.`
+            : `${player}'s last ${RECENT} matches.`}
+        </p>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Result</th>
+                <th>Opponent</th>
+                <th>Score</th>
+                <th className="num">ELO change</th>
+                <th className="num">Rating after</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(showAllMatches ? myMatches : myMatches.slice(0, RECENT)).map((m) => {
+                const isP1 = m.player1 === player;
+                const opponent = isP1 ? m.player2 : m.player1;
+                const delta = isP1
+                  ? m.rating1After - m.rating1Before
+                  : m.rating2After - m.rating2Before;
+                const after = isP1 ? m.rating1After : m.rating2After;
+                const won = m.winnerName === player;
+                return (
+                  <tr key={m.id}>
+                    <td>{formatDate(m.date)}</td>
+                    <td>
+                      <span className={`badge ${won ? "up" : "down"}`}>
+                        {won ? "Won" : "Lost"}
+                      </span>
+                    </td>
+                    <td>
+                      <Link
+                        className="player-link"
+                        to={`/player/${encodeURIComponent(opponent)}`}
+                      >
+                        {opponent}
+                      </Link>
+                    </td>
+                    <td style={{ color: "var(--text-dim)" }}>
+                      {m.score ?? "—"}
+                      {m.tournament && (
+                        <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
+                          🏆 {m.tournament}
+                        </span>
+                      )}
+                    </td>
+                    <td className="num">
+                      <Delta value={delta} />
+                    </td>
+                    <td className="num rating">{round0(after)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {myMatches.length > RECENT && (
+          <div style={{ marginTop: 14, textAlign: "center" }}>
+            <button
+              className="btn ghost"
+              onClick={() => setShowAllMatches((s) => !s)}
+            >
+              {showAllMatches
+                ? `Show last ${RECENT} only`
+                : `Show all ${myMatches.length} matches`}
+            </button>
           </div>
         )}
       </div>
