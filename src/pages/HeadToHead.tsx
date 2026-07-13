@@ -148,9 +148,18 @@ export default function HeadToHeadPage() {
                 <div className="hint">consecutive wins</div>
               </div>
               <div className="stat-tile">
-                <div className="label">Rating swing</div>
-                <div className="value">{signed(h2h.ratingSwingA)}</div>
-                <div className="hint">net ELO {h2h.a} gained from this matchup</div>
+                <div className="label">Rating swing — {h2h.a}</div>
+                <div className={`value ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}>
+                  {signed(h2h.ratingSwingA)}
+                </div>
+                <div className="hint">net ELO from this matchup</div>
+              </div>
+              <div className="stat-tile">
+                <div className="label">Rating swing — {h2h.b}</div>
+                <div className={`value ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}>
+                  {signed(h2h.ratingSwingB)}
+                </div>
+                <div className="hint">net ELO from this matchup</div>
               </div>
               <div className="stat-tile">
                 <div className="label">First meeting</div>

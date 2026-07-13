@@ -218,6 +218,7 @@ export interface HeadToHead {
   bestStreakA: number;
   bestStreakB: number;
   ratingSwingA: number; // net rating A gained from this matchup
+  ratingSwingB: number; // net rating B gained from this matchup
   matches: EnrichedMatch[]; // chronological
   firstMeeting: string | null;
   lastMeeting: string | null;
@@ -336,6 +337,7 @@ export function headToHead(enriched: EnrichedMatch[], a: string, b: string): Hea
   let bestStreakA = 0;
   let bestStreakB = 0;
   let ratingSwingA = 0;
+  let ratingSwingB = 0;
 
   for (const m of between) {
     const aWon = m.winnerName === a;
@@ -355,6 +357,9 @@ export function headToHead(enriched: EnrichedMatch[], a: string, b: string): Hea
     ratingSwingA += aIsP1
       ? m.rating1After - m.rating1Before
       : m.rating2After - m.rating2Before;
+    ratingSwingB += aIsP1
+      ? m.rating2After - m.rating2Before
+      : m.rating1After - m.rating1Before;
   }
 
   return {
@@ -368,6 +373,7 @@ export function headToHead(enriched: EnrichedMatch[], a: string, b: string): Hea
     bestStreakA,
     bestStreakB,
     ratingSwingA,
+    ratingSwingB,
     matches: between,
     firstMeeting: between.length ? between[0].date : null,
     lastMeeting: between.length ? between[between.length - 1].date : null,
