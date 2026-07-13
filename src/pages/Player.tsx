@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { headToHead, RATED_MIN } from "../lib/elo";
+import { headToHead, RATED_MIN, START_RATING } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
@@ -73,7 +73,9 @@ export default function PlayerPage() {
               <>
                 <div className="value">{round0(stats.peakRating)}</div>
                 <div className="hint">
-                  {stats.peakDate ? `reached ${formatDate(stats.peakDate)}` : "at start rating"}
+                  {stats.peakRating > START_RATING
+                    ? `reached ${formatDate(stats.peakDate)}`
+                    : `at start rating · since ${formatDate(stats.peakDate)}`}
                 </div>
               </>
             ) : (

@@ -130,6 +130,10 @@ export function replay(matches: Match[]): ReplayResult {
 
     p1.rating = r1After;
     p2.rating = r2After;
+    // A debuting player holds their peak (the start rating) from day one;
+    // any later climb above it overwrites this with the new peak's date.
+    if (p1.played === 0) p1.peakDate = m.date;
+    if (p2.played === 0) p2.peakDate = m.date;
     if (r1After > p1.peakRating) {
       p1.peakRating = r1After;
       p1.peakDate = m.date;
