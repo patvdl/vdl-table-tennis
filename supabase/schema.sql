@@ -37,6 +37,15 @@ insert into public.tournaments (name, date, status) values
   ('Christmas 2025', '2025-12-25', 'completed')
 on conflict (name) do nothing;
 
+-- ============ players (profile photos) ============
+create table if not exists public.players (
+  -- must match the player name used on matches
+  name text primary key,
+  -- small square JPEG data URL (resized client-side before upload)
+  avatar text,
+  updated_at timestamptz not null default now()
+);
+
 -- ============ profiles (roles) ============
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -79,6 +88,28 @@ $$;
 alter table public.matches enable row level security;
 alter table public.profiles enable row level security;
 alter table public.tournaments enable row level security;
+alter table public.players enable row level security;
+
+-- Everyone can see profile photos; only admins can manage them
+drop policy if exists "players are public to read" on public.players;
+create policy "players are public to read"
+  on public.players for select
+  using (true);
+
+drop policy if exists "admins can insert players" on public.players;
+create policy "admins can insert players"
+  on public.players for insert
+  with check (public.is_admin());
+
+drop policy if exists "admins can update players" on public.players;
+create policy "admins can update players"
+  on public.players for update
+  using (public.is_admin());
+
+drop policy if exists "admins can delete players" on public.players;
+create policy "admins can delete players"
+  on public.players for delete
+  using (public.is_admin());
 
 -- Everyone can read tournaments; only admins can manage them
 drop policy if exists "tournaments are public to read" on public.tournaments;

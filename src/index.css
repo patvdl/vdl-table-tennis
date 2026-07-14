@@ -499,6 +499,23 @@ select:focus {
   color: var(--text-dim);
 }
 
+/* ---------- avatars ---------- */
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.avatar-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  user-select: none;
+}
+
 /* ---------- h2h win prediction bar ---------- */
 .pred-bar {
   display: flex;

@@ -10,7 +10,7 @@ import {
 import { store, type NewMatch } from "./store";
 import { replay, leaderboard, unratedPlayers, type ReplayResult } from "../lib/elo";
 import { analyzeTournament, type TournamentAnalysis } from "../lib/bracket";
-import type { Match, PlayerStats, Tournament } from "../types";
+import type { Match, PlayerProfile, PlayerStats, Tournament } from "../types";
 
 export interface TournamentSummary extends Tournament {
   analysis: TournamentAnalysis;
@@ -29,6 +29,9 @@ interface MatchesState {
   playerNames: string[];
   /** All tournaments, newest first, with derived bracket/podium info */
   tournaments: TournamentSummary[];
+  /** Profile photos by player name (players without one use the letter placeholder) */
+  avatars: Map<string, string>;
+  setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
   addMatch(m: NewMatch): Promise<void>;
   removeMatch(id: string): Promise<void>;
   addTournament(name: string, date: string): Promise<void>;
@@ -43,6 +46,7 @@ const MatchesContext = createContext<MatchesState | null>(null);
 export function MatchesProvider({ children }: { children: ReactNode }) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [tournamentRows, setTournamentRows] = useState<Tournament[]>([]);
+  const [playerRows, setPlayerRows] = useState<PlayerProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +59,12 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
       } catch {
         // Tournaments are non-critical; keep the site alive if the table is missing
         setTournamentRows([]);
+      }
+      try {
+        setPlayerRows(await store.loadPlayers());
+      } catch {
+        // Avatars are non-critical; letter placeholders cover everyone
+        setPlayerRows([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -96,6 +106,12 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     [tournamentRows, replayResult],
   );
 
+  const avatars = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of playerRows) if (p.avatar) m.set(p.name, p.avatar);
+    return m;
+  }, [playerRows]);
+
   const value: MatchesState = {
     loading,
     error,
@@ -105,6 +121,11 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     unratedBoard,
     playerNames,
     tournaments,
+    avatars,
+    async setPlayerAvatar(name, avatar) {
+      await store.setPlayerAvatar(name, avatar);
+      await refresh();
+    },
     async addMatch(m) {
       await store.add(m);
       await refresh();

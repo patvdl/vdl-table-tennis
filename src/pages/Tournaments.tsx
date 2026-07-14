@@ -4,6 +4,7 @@ import { useMatches, type TournamentSummary } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { formatDate } from "../lib/format";
 import Bracket, { PlannedBracket } from "../components/Bracket";
+import Avatar from "../components/Avatar";
 
 function today(): string {
   const d = new Date();
@@ -27,6 +28,7 @@ function Podium({ t }: { t: TournamentSummary }) {
         .map((s) => (
           <div key={s.label} className={`podium-tile ${s.label === "Champion" ? "champ" : ""}`}>
             <div className="podium-medal">{s.medal}</div>
+            <Avatar player={s.name!} size={44} />
             <div>
               <div className="label">{s.label}</div>
               <Link

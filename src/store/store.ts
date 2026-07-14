@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import type { Match, Tournament } from "../types";
+import type { Match, PlayerProfile, Tournament } from "../types";
 import seedRaw from "../data/seed-matches.json";
 
 export type StoreMode = "supabase" | "local";
@@ -28,6 +28,9 @@ export interface DataStore {
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
   setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
   removeTournament(id: string): Promise<void>;
+  loadPlayers(): Promise<PlayerProfile[]>;
+  /** Set a player's profile photo (data URL); null removes it */
+  setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
 }
 
 type SeedRow = [string, string, string, number, (string | null)?, (string | null)?];
@@ -47,6 +50,7 @@ function seedMatches(): Match[] {
 
 const LOCAL_KEY = "vdl-tt-matches-v2";
 const LOCAL_T_KEY = "vdl-tt-tournaments-v1";
+const LOCAL_P_KEY = "vdl-tt-avatars-v1";
 
 const localStore: DataStore = {
   mode: "local",
@@ -107,6 +111,22 @@ const localStore: DataStore = {
   async removeTournament(id) {
     const all = (await this.loadTournaments()).filter((t) => t.id !== id);
     localStorage.setItem(LOCAL_T_KEY, JSON.stringify(all));
+  },
+  async loadPlayers() {
+    try {
+      const raw = localStorage.getItem(LOCAL_P_KEY);
+      const rec = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      return Object.entries(rec).map(([name, avatar]) => ({ name, avatar }));
+    } catch {
+      return [];
+    }
+  },
+  async setPlayerAvatar(name, avatar) {
+    const raw = localStorage.getItem(LOCAL_P_KEY);
+    const rec = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    if (avatar) rec[name] = avatar;
+    else delete rec[name];
+    localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
   },
 };
 
@@ -175,6 +195,23 @@ function makeSupabaseStore(): DataStore {
     async removeTournament(id) {
       const { error } = await sb.from("tournaments").delete().eq("id", id);
       if (error) throw new Error(error.message);
+    },
+    async loadPlayers() {
+      const { data, error } = await sb.from("players").select("*");
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => ({
+        name: String(r.name),
+        avatar: r.avatar ? String(r.avatar) : null,
+      }));
+    },
+    async setPlayerAvatar(name, avatar) {
+      if (avatar) {
+        const { error } = await sb.from("players").upsert({ name, avatar });
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await sb.from("players").delete().eq("name", name);
+        if (error) throw new Error(error.message);
+      }
     },
   };
 }

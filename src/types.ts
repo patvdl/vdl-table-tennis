@@ -52,6 +52,12 @@ export interface EnrichedMatch extends Match {
 
 export type Role = "anon" | "viewer" | "admin";
 
+export interface PlayerProfile {
+  name: string;
+  /** Data-URL image; null/missing = letter placeholder */
+  avatar: string | null;
+}
+
 export interface Tournament {
   id: string;
   /** Label carried by this tournament's matches, e.g. "Christmas 2024" */

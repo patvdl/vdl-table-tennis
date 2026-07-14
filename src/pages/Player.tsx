@@ -1,20 +1,56 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
+import { useAuth } from "../store/auth";
 import { headToHead, RATED_MIN, START_RATING } from "../lib/elo";
+import { fileToAvatar } from "../lib/image";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import Delta from "../components/Delta";
+import Avatar from "../components/Avatar";
 
 const RECENT = 5;
 
 export default function PlayerPage() {
   const { name = "" } = useParams();
   const player = decodeURIComponent(name);
-  const { board, replayResult, tournaments } = useMatches();
+  const { board, replayResult, tournaments, avatars, setPlayerAvatar } = useMatches();
+  const { role } = useAuth();
   const titles = tournaments.filter((t) => t.champion === player);
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      await setPlayerAvatar(player, await fileToAvatar(file));
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const onRemovePhoto = async () => {
+    if (!confirm(`Remove ${player}'s profile photo?`)) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      await setPlayerAvatar(player, null);
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   const stats = replayResult.stats.get(player);
   const rank = board.findIndex((p) => p.name === player) + 1;
@@ -54,16 +90,55 @@ export default function PlayerPage() {
   return (
     <>
       <div className="card">
-        <h2>
-          {player}{" "}
-          {isRated ? (
-            <span className={`badge ${rank === 1 ? "gold" : "neutral"}`}>#{rank}</span>
-          ) : (
-            <span className="badge neutral">Unrated</span>
-          )}
-          <Trophy player={player} />
-        </h2>
-        <p className="sub">Full career profile</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
+          <Avatar player={player} size={76} />
+          <div>
+            <h2 style={{ marginBottom: 2 }}>
+              {player}{" "}
+              {isRated ? (
+                <span className={`badge ${rank === 1 ? "gold" : "neutral"}`}>#{rank}</span>
+              ) : (
+                <span className="badge neutral">Unrated</span>
+              )}
+              <Trophy player={player} />
+            </h2>
+            <p className="sub" style={{ margin: 0 }}>Full career profile</p>
+            {role === "admin" && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn ghost"
+                  style={{ padding: "4px 12px", fontSize: 12 }}
+                  disabled={avatarBusy}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {avatarBusy ? "…" : avatars.has(player) ? "Change photo" : "Add photo"}
+                </button>
+                {avatars.has(player) && (
+                  <button
+                    className="btn danger"
+                    style={{ padding: "4px 12px", fontSize: 12 }}
+                    disabled={avatarBusy}
+                    onClick={onRemovePhoto}
+                  >
+                    Remove photo
+                  </button>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={onPickPhoto}
+                />
+              </div>
+            )}
+            {avatarError && (
+              <p className="sub" style={{ margin: "6px 0 0", color: "var(--red)" }}>
+                {avatarError}
+              </p>
+            )}
+          </div>
+        </div>
         <div className="stat-grid">
           <div className="stat-tile">
             <div className="label">Rating</div>
