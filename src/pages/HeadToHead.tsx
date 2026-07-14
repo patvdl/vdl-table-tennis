@@ -63,7 +63,9 @@ export default function HeadToHeadPage() {
         {pct(Math.max(pred.pRating, 1 - pred.pRating))} · head-to-head:{" "}
         {pred.h2hWinsA + pred.h2hWinsB === 0
           ? "never met"
-          : `${pred.h2hWinsA >= pred.h2hWinsB ? a : b} leads ${Math.max(pred.h2hWinsA, pred.h2hWinsB)}–${Math.min(pred.h2hWinsA, pred.h2hWinsB)}`}{" "}
+          : pred.h2hWinsA === pred.h2hWinsB
+            ? `tied ${pred.h2hWinsA}–${pred.h2hWinsB}`
+            : `${pred.h2hWinsA > pred.h2hWinsB ? a : b} leads ${Math.max(pred.h2hWinsA, pred.h2hWinsB)}–${Math.min(pred.h2hWinsA, pred.h2hWinsB)}`}{" "}
         · form: {a} {streakLabel(pred.streakA)}, {b} {streakLabel(pred.streakB)}
       </div>
     </div>
