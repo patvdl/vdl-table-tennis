@@ -1,9 +1,9 @@
-const AVATAR_SIZE = 256;
+const AVATAR_SIZE = 512;
 
 /**
  * Turns an uploaded photo into a small square avatar:
- * center-cropped, resized to 256px and encoded as a JPEG data URL
- * (~20-40 KB) so it can live directly in the database.
+ * center-cropped, resized to 512px and encoded as a JPEG data URL
+ * (~50-90 KB) so it can live directly in the database.
  */
 export function fileToAvatar(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

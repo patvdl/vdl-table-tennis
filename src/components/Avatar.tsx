@@ -15,15 +15,16 @@ export default function Avatar({ player, size = 40 }: { player: string; size?: n
   const { avatars } = useMatches();
   const src = avatars.get(player);
 
+  // Big avatars shrink on narrow phone screens instead of overflowing
+  const dim = size > 100 ? `min(${size}px, 36vw)` : `${size}px`;
+
   if (src) {
     return (
       <img
         className="avatar"
         src={src}
         alt={player}
-        width={size}
-        height={size}
-        style={{ width: size, height: size }}
+        style={{ width: dim, height: dim }}
       />
     );
   }
@@ -34,9 +35,9 @@ export default function Avatar({ player, size = 40 }: { player: string; size?: n
       className="avatar avatar-letter"
       aria-label={player}
       style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.42,
+        width: dim,
+        height: dim,
+        fontSize: `calc(${dim} * 0.42)`,
         background: `hsl(${hue} 35% 26%)`,
         color: `hsl(${hue} 70% 78%)`,
       }}
