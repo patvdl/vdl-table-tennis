@@ -104,12 +104,12 @@ export default function HeadToHeadPage() {
         <div className="card">
           <div className="h2h-hero" style={{ paddingBottom: 8 }}>
             <div className="h2h-side">
-              <Avatar player={a} size={88} />
+              <Avatar player={a} size={132} />
               <div className="name win-a" style={{ marginTop: 8 }}>{a}</div>
             </div>
             <div className="h2h-vs">VS</div>
             <div className="h2h-side">
-              <Avatar player={b} size={88} />
+              <Avatar player={b} size={132} />
               <div className="name win-b" style={{ marginTop: 8 }}>{b}</div>
             </div>
           </div>
@@ -125,14 +125,14 @@ export default function HeadToHeadPage() {
           <div className="card">
             <div className="h2h-hero">
               <div className="h2h-side">
-                <Avatar player={h2h.a} size={88} />
+                <Avatar player={h2h.a} size={132} />
                 <div className="name win-a" style={{ marginTop: 8 }}>{h2h.a}</div>
                 <div className="big win-a">{h2h.winsA}</div>
                 <div className="meta">{pct(h2h.winsA / h2h.total)} of meetings</div>
               </div>
               <div className="h2h-vs">VS</div>
               <div className="h2h-side">
-                <Avatar player={h2h.b} size={88} />
+                <Avatar player={h2h.b} size={132} />
                 <div className="name win-b" style={{ marginTop: 8 }}>{h2h.b}</div>
                 <div className="big win-b">{h2h.winsB}</div>
                 <div className="meta">{pct(h2h.winsB / h2h.total)} of meetings</div>

@@ -28,7 +28,7 @@ function Podium({ t }: { t: TournamentSummary }) {
         .map((s) => (
           <div key={s.label} className={`podium-tile ${s.label === "Champion" ? "champ" : ""}`}>
             <div className="podium-medal">{s.medal}</div>
-            <Avatar player={s.name!} size={44} />
+            <Avatar player={s.name!} size={60} />
             <div>
               <div className="label">{s.label}</div>
               <Link
