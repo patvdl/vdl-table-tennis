@@ -91,7 +91,7 @@ export default function PlayerPage() {
     <>
       <div className="card">
         <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
-          <Avatar player={player} size={336} />
+          <Avatar player={player} size={240} />
           <div>
             <h2 style={{ marginBottom: 2 }}>
               {player}{" "}
