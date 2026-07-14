@@ -33,6 +33,10 @@ export interface DataStore {
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
   /** Register a brand-new player (no matches yet) */
   addPlayer(name: string): Promise<void>;
+  /** Rename a player everywhere: matches, profile photo, tournament brackets */
+  renamePlayer(oldName: string, newName: string): Promise<void>;
+  /** Delete a player and every match they played */
+  removePlayer(name: string): Promise<void>;
 }
 
 type SeedRow = [string, string, string, number, (string | null)?, (string | null)?];
@@ -136,6 +140,40 @@ const localStore: DataStore = {
     rec[name] = null;
     localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
   },
+  async renamePlayer(oldName, newName) {
+    const all = (await this.load()).map((m) => ({
+      ...m,
+      player1: m.player1 === oldName ? newName : m.player1,
+      player2: m.player2 === oldName ? newName : m.player2,
+    }));
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+
+    const raw = localStorage.getItem(LOCAL_P_KEY);
+    const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
+    if (oldName in rec) {
+      rec[newName] = rec[oldName];
+      delete rec[oldName];
+      localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
+    }
+
+    const ts = (await this.loadTournaments()).map((t) =>
+      t.bracket
+        ? { ...t, bracket: t.bracket.map((s) => (s === oldName ? newName : s)) }
+        : t,
+    );
+    localStorage.setItem(LOCAL_T_KEY, JSON.stringify(ts));
+  },
+  async removePlayer(name) {
+    const all = (await this.load()).filter(
+      (m) => m.player1 !== name && m.player2 !== name,
+    );
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+
+    const raw = localStorage.getItem(LOCAL_P_KEY);
+    const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
+    delete rec[name];
+    localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
+  },
 };
 
 function makeSupabaseStore(): DataStore {
@@ -219,6 +257,34 @@ function makeSupabaseStore(): DataStore {
     async addPlayer(name) {
       const { error } = await sb.from("players").insert({ name });
       if (error) throw new Error(error.message);
+    },
+    async renamePlayer(oldName, newName) {
+      let r = await sb.from("matches").update({ player1: newName }).eq("player1", oldName);
+      if (r.error) throw new Error(r.error.message);
+      r = await sb.from("matches").update({ player2: newName }).eq("player2", oldName);
+      if (r.error) throw new Error(r.error.message);
+      r = await sb.from("players").update({ name: newName }).eq("name", oldName);
+      if (r.error) throw new Error(r.error.message);
+
+      const { data, error } = await sb.from("tournaments").select("id, bracket");
+      if (error) throw new Error(error.message);
+      for (const t of data ?? []) {
+        if (Array.isArray(t.bracket) && t.bracket.includes(oldName)) {
+          const bracket = t.bracket.map((s: string | null) =>
+            s === oldName ? newName : s,
+          );
+          const u = await sb.from("tournaments").update({ bracket }).eq("id", t.id);
+          if (u.error) throw new Error(u.error.message);
+        }
+      }
+    },
+    async removePlayer(name) {
+      let r = await sb.from("matches").delete().eq("player1", name);
+      if (r.error) throw new Error(r.error.message);
+      r = await sb.from("matches").delete().eq("player2", name);
+      if (r.error) throw new Error(r.error.message);
+      r = await sb.from("players").delete().eq("name", name);
+      if (r.error) throw new Error(r.error.message);
     },
   };
 }

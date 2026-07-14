@@ -33,6 +33,8 @@ interface MatchesState {
   avatars: Map<string, string>;
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
   addPlayer(name: string): Promise<void>;
+  renamePlayer(oldName: string, newName: string): Promise<void>;
+  removePlayer(name: string): Promise<void>;
   addMatch(m: NewMatch): Promise<void>;
   removeMatch(id: string): Promise<void>;
   addTournament(name: string, date: string): Promise<void>;
@@ -136,6 +138,14 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     },
     async addPlayer(name) {
       await store.addPlayer(name);
+      await refresh();
+    },
+    async renamePlayer(oldName, newName) {
+      await store.renamePlayer(oldName, newName);
+      await refresh();
+    },
+    async removePlayer(name) {
+      await store.removePlayer(name);
       await refresh();
     },
     async addMatch(m) {

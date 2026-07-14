@@ -3,6 +3,7 @@ import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { predictMatch } from "../lib/elo";
 import { pct, round0 } from "../lib/format";
+import PlayerCombo from "../components/PlayerCombo";
 
 function today(): string {
   const d = new Date();
@@ -12,7 +13,7 @@ function today(): string {
 }
 
 export default function AddMatch() {
-  const { playerNames, replayResult, addMatch, tournaments } = useMatches();
+  const { replayResult, addMatch, tournaments } = useMatches();
   const { role } = useAuth();
   const activeTournaments = tournaments.filter((t) => t.status === "active");
 
@@ -79,15 +80,6 @@ export default function AddMatch() {
     }
   };
 
-  const playerInput = (value: string, onChange: (v: string) => void) => (
-    <input
-      list="all-players"
-      placeholder="Select or type a name…"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-
   return (
     <div className="card">
       <h2>Add Match</h2>
@@ -122,7 +114,6 @@ export default function AddMatch() {
             >
               <input
                 type="checkbox"
-                style={{ width: "auto", margin: 0 }}
                 checked={isTournament}
                 onChange={(e) => {
                   setIsTournament(e.target.checked);
@@ -153,20 +144,14 @@ export default function AddMatch() {
           <div />
         </div>
 
-        <datalist id="all-players">
-          {playerNames.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
-
         <div className="form-row">
           <div>
             <label className="field">Player 1</label>
-            {playerInput(p1, setP1)}
+            <PlayerCombo value={p1} onChange={setP1} />
           </div>
           <div>
             <label className="field">Player 2</label>
-            {playerInput(p2, setP2)}
+            <PlayerCombo value={p2} onChange={setP2} />
           </div>
         </div>
 

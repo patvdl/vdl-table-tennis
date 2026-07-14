@@ -8,6 +8,7 @@ import type { PlayerStats } from "../types";
 import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
+import PlayerActions from "../components/PlayerActions";
 
 function todayISO(): string {
   const d = new Date();
@@ -256,6 +257,7 @@ export default function Leaderboard() {
               <Th k="streak" label="Streak" />
               <th>Form</th>
               <Th k="last" label="Last played" />
+              {role === "admin" && <th aria-label="Actions" />}
             </tr>
           </thead>
           <tbody>
@@ -294,6 +296,11 @@ export default function Leaderboard() {
                   <td style={{ color: "var(--text-dim)" }}>
                     {formatDate(p.lastPlayed)}
                   </td>
+                  {role === "admin" && (
+                    <td className="actions-cell">
+                      <PlayerActions player={p.name} />
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -321,6 +328,7 @@ export default function Leaderboard() {
                 <th className="num">Win %</th>
                 <th>Until ranked</th>
                 <th>Last played</th>
+                {role === "admin" && <th aria-label="Actions" />}
               </tr>
             </thead>
             <tbody>
@@ -351,6 +359,11 @@ export default function Leaderboard() {
                   <td style={{ color: "var(--text-dim)" }}>
                     {formatDate(p.lastPlayed)}
                   </td>
+                  {role === "admin" && (
+                    <td className="actions-cell">
+                      <PlayerActions player={p.name} />
+                    </td>
+                  )}
                 </tr>
               ))}
               {pendingPlayers.map((n) => (
@@ -372,6 +385,11 @@ export default function Leaderboard() {
                     <span className="badge neutral">{RATED_MIN} more matches</span>
                   </td>
                   <td style={{ color: "var(--text-dim)" }}>—</td>
+                  {role === "admin" && (
+                    <td className="actions-cell">
+                      <PlayerActions player={n} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

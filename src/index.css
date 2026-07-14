@@ -31,6 +31,7 @@ body {
 body {
   background: var(--bg);
   color: var(--text);
+  color-scheme: dark;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.5;
@@ -326,6 +327,180 @@ select {
 input:focus,
 select:focus {
   border-color: var(--accent);
+}
+
+/* ---------- checkbox (transparent, dark-theme friendly) ---------- */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+input[type="checkbox"]:hover {
+  border-color: var(--accent);
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4.5px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #0d1117;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ---------- player combobox ---------- */
+.combo {
+  position: relative;
+}
+
+.combo-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px #00000066;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.combo-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.combo-item.active,
+.combo-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- three-dots menu ---------- */
+.menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 9px;
+  border-radius: 7px;
+  vertical-align: middle;
+}
+
+.menu-btn:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.menu {
+  position: fixed;
+  z-index: 61;
+  min-width: 155px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px #00000088;
+  padding: 4px;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--bg-soft);
+}
+
+.menu-item.danger {
+  color: var(--red);
+}
+
+.menu-item.danger:hover {
+  background: var(--red-soft);
+}
+
+.actions-cell {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---------- modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: #000000a8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px #000000aa;
+  padding: 22px 24px;
+  width: 100%;
+  max-width: 420px;
+  text-align: left; /* don't inherit alignment from table cells */
+}
+
+.modal h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .form-row {
