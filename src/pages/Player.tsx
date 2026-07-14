@@ -16,7 +16,7 @@ const RECENT = 5;
 export default function PlayerPage() {
   const { name = "" } = useParams();
   const player = decodeURIComponent(name);
-  const { board, replayResult, tournaments, avatars, setPlayerAvatar } = useMatches();
+  const { board, replayResult, tournaments, avatars, setPlayerAvatar, playerNames } = useMatches();
   const { role } = useAuth();
   const titles = tournaments.filter((t) => t.champion === player);
 
@@ -76,11 +76,63 @@ export default function PlayerPage() {
       .sort((x, y) => y.total - x.total);
   }, [player, stats, replayResult]);
 
+  const photoControls = (
+    <>
+      {role === "admin" && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <button
+            className="btn ghost"
+            style={{ padding: "4px 12px", fontSize: 12 }}
+            disabled={avatarBusy}
+            onClick={() => fileRef.current?.click()}
+          >
+            {avatarBusy ? "…" : avatars.has(player) ? "Change photo" : "Add photo"}
+          </button>
+          {avatars.has(player) && (
+            <button
+              className="btn danger"
+              style={{ padding: "4px 12px", fontSize: 12 }}
+              disabled={avatarBusy}
+              onClick={onRemovePhoto}
+            >
+              Remove photo
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={onPickPhoto}
+          />
+        </div>
+      )}
+      {avatarError && (
+        <p className="sub" style={{ margin: "6px 0 0", color: "var(--red)" }}>
+          {avatarError}
+        </p>
+      )}
+    </>
+  );
+
   if (!stats) {
+    const isRegistered = playerNames.includes(player);
     return (
       <div className="card">
-        <h2>{player}</h2>
-        <p className="sub">No matches found for this player.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <Avatar player={player} size={240} />
+          <div>
+            <h2 style={{ marginBottom: 2 }}>
+              {player} {isRegistered && <span className="badge neutral">Unrated</span>}
+            </h2>
+            <p className="sub" style={{ margin: 0 }}>
+              {isRegistered
+                ? "No matches yet — they'll join the rankings once they start playing."
+                : "No matches found for this player."}
+            </p>
+            {isRegistered && photoControls}
+          </div>
+        </div>
       </div>
     );
   }
@@ -103,40 +155,7 @@ export default function PlayerPage() {
               <Trophy player={player} />
             </h2>
             <p className="sub" style={{ margin: 0 }}>Full career profile</p>
-            {role === "admin" && (
-              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button
-                  className="btn ghost"
-                  style={{ padding: "4px 12px", fontSize: 12 }}
-                  disabled={avatarBusy}
-                  onClick={() => fileRef.current?.click()}
-                >
-                  {avatarBusy ? "…" : avatars.has(player) ? "Change photo" : "Add photo"}
-                </button>
-                {avatars.has(player) && (
-                  <button
-                    className="btn danger"
-                    style={{ padding: "4px 12px", fontSize: 12 }}
-                    disabled={avatarBusy}
-                    onClick={onRemovePhoto}
-                  >
-                    Remove photo
-                  </button>
-                )}
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={onPickPhoto}
-                />
-              </div>
-            )}
-            {avatarError && (
-              <p className="sub" style={{ margin: "6px 0 0", color: "var(--red)" }}>
-                {avatarError}
-              </p>
-            )}
+            {photoControls}
           </div>
         </div>
         <div className="stat-grid">

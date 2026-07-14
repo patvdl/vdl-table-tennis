@@ -19,16 +19,15 @@ export default function AddMatch() {
   const [date, setDate] = useState(today());
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
-  const [newP1, setNewP1] = useState("");
-  const [newP2, setNewP2] = useState("");
   const [winner, setWinner] = useState<1 | 2>(1);
   const [score, setScore] = useState("");
+  const [isTournament, setIsTournament] = useState(false);
   const [tournament, setTournament] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  const name1 = p1 === "__new__" ? newP1.trim() : p1;
-  const name2 = p2 === "__new__" ? newP2.trim() : p2;
+  const name1 = p1.trim();
+  const name2 = p2.trim();
 
   const preview = useMemo(() => {
     if (!name1 || !name2 || name1 === name2) return null;
@@ -66,7 +65,7 @@ export default function AddMatch() {
         player2: name2,
         winner,
         score: score.trim() || null,
-        tournament: tournament.trim() || null,
+        tournament: isTournament ? tournament.trim() || null : null,
       });
       setMsg({
         kind: "ok",
@@ -80,20 +79,13 @@ export default function AddMatch() {
     }
   };
 
-  const playerSelect = (
-    value: string,
-    onChange: (v: string) => void,
-    exclude: string,
-  ) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Select player…</option>
-      {playerNames.map((n) => (
-        <option key={n} value={n} disabled={n === exclude}>
-          {n}
-        </option>
-      ))}
-      <option value="__new__">+ New player…</option>
-    </select>
+  const playerInput = (value: string, onChange: (v: string) => void) => (
+    <input
+      list="all-players"
+      placeholder="Select or type a name…"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 
   return (
@@ -124,49 +116,57 @@ export default function AddMatch() {
 
         <div className="form-row">
           <div>
-            <label className="field">Tournament (optional)</label>
-            <select value={tournament} onChange={(e) => setTournament(e.target.value)}>
-              <option value="">None — regular match</option>
-              {activeTournaments.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
-                </option>
+            <label
+              className="field"
+              style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                style={{ width: "auto", margin: 0 }}
+                checked={isTournament}
+                onChange={(e) => {
+                  setIsTournament(e.target.checked);
+                  setTournament(e.target.checked ? (activeTournaments[0]?.name ?? "") : "");
+                }}
+              />
+              Tournament
+            </label>
+            {isTournament &&
+              (activeTournaments.length > 0 ? (
+                <select
+                  style={{ marginTop: 8 }}
+                  value={tournament}
+                  onChange={(e) => setTournament(e.target.value)}
+                >
+                  {activeTournaments.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="sub" style={{ marginTop: 8, fontSize: 12 }}>
+                  No active tournament. Create one from the Tournaments tab first.
+                </p>
               ))}
-            </select>
-            {activeTournaments.length === 0 && (
-              <p className="sub" style={{ marginTop: 6, fontSize: 12 }}>
-                No active tournament. Create one from the Tournaments tab to record tournament
-                matches.
-              </p>
-            )}
           </div>
           <div />
         </div>
 
+        <datalist id="all-players">
+          {playerNames.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+
         <div className="form-row">
           <div>
             <label className="field">Player 1</label>
-            {playerSelect(p1, setP1, p2)}
-            {p1 === "__new__" && (
-              <input
-                style={{ marginTop: 8 }}
-                placeholder="New player name"
-                value={newP1}
-                onChange={(e) => setNewP1(e.target.value)}
-              />
-            )}
+            {playerInput(p1, setP1)}
           </div>
           <div>
             <label className="field">Player 2</label>
-            {playerSelect(p2, setP2, p1)}
-            {p2 === "__new__" && (
-              <input
-                style={{ marginTop: 8 }}
-                placeholder="New player name"
-                value={newP2}
-                onChange={(e) => setNewP2(e.target.value)}
-              />
-            )}
+            {playerInput(p2, setP2)}
           </div>
         </div>
 

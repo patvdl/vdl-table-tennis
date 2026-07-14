@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
+import { useAuth } from "../store/auth";
 import { RATED_MIN, replay, leaderboard, unratedPlayers } from "../lib/elo";
 import { formatDate, round0, pct } from "../lib/format";
 import type { PlayerStats } from "../types";
@@ -62,10 +63,43 @@ function sortValue(p: PlayerStats, key: SortKey): string | number {
 }
 
 export default function Leaderboard() {
-  const { board, unratedBoard, matches } = useMatches();
+  const { board, unratedBoard, matches, playerNames, replayResult, addPlayer } = useMatches();
+  const { role } = useAuth();
   const [sortKey, setSortKey] = useState<SortKey>("rating");
   const [dir, setDir] = useState<1 | -1>(-1);
   const [asOf, setAsOf] = useState(""); // "" = today (live board)
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [newPlayer, setNewPlayer] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addMsg, setAddMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // Registered players who haven't played a match yet
+  const pendingPlayers = useMemo(
+    () => playerNames.filter((n) => !replayResult.stats.has(n)),
+    [playerNames, replayResult],
+  );
+
+  const submitPlayer = async (e: FormEvent) => {
+    e.preventDefault();
+    const name = newPlayer.trim();
+    setAddMsg(null);
+    if (!name) return;
+    if (playerNames.some((n) => n.toLowerCase() === name.toLowerCase())) {
+      setAddMsg({ kind: "err", text: `"${name}" already exists.` });
+      return;
+    }
+    setAddBusy(true);
+    try {
+      await addPlayer(name);
+      setNewPlayer("");
+      setShowAddPlayer(false);
+      setAddMsg({ kind: "ok", text: `${name} added — they'll show under unrated players until they've played ${RATED_MIN} matches.` });
+    } catch (err) {
+      setAddMsg({ kind: "err", text: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setAddBusy(false);
+    }
+  };
 
   const today = todayISO();
   const firstDate = useMemo(
@@ -143,12 +177,38 @@ export default function Leaderboard() {
   return (
     <>
     <div className="card">
-      <h2>Leaderboard</h2>
-      <p className="sub">
-        {timeTravelling
-          ? `The rankings as they stood on ${formatDate(asOf)} · ${view.matchCount} matches played by then`
-          : `${view.board.length} ranked players · ${view.matchCount} matches recorded · click a column to sort`}
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h2>Leaderboard</h2>
+          <p className="sub">
+            {timeTravelling
+              ? `The rankings as they stood on ${formatDate(asOf)} · ${view.matchCount} matches played by then`
+              : `${view.board.length} ranked players · ${view.matchCount} matches recorded · click a column to sort`}
+          </p>
+        </div>
+        {role === "admin" && (
+          <button className="btn ghost" onClick={() => { setShowAddPlayer((s) => !s); setAddMsg(null); }}>
+            {showAddPlayer ? "Cancel" : "+ Add player"}
+          </button>
+        )}
+      </div>
+
+      {addMsg && <div className={`notice ${addMsg.kind}`}>{addMsg.text}</div>}
+
+      {showAddPlayer && (
+        <form onSubmit={submitPlayer} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+          <input
+            style={{ maxWidth: 240 }}
+            placeholder="New player name"
+            value={newPlayer}
+            onChange={(e) => setNewPlayer(e.target.value)}
+            autoFocus
+          />
+          <button className="btn" type="submit" disabled={addBusy || !newPlayer.trim()}>
+            {addBusy ? "Adding…" : "Add player"}
+          </button>
+        </form>
+      )}
 
       <div
         style={{
@@ -243,7 +303,7 @@ export default function Leaderboard() {
       )}
     </div>
 
-    {view.unratedBoard.length > 0 && (
+    {(view.unratedBoard.length > 0 || pendingPlayers.length > 0) && (
       <div className="card">
         <h2>Unrated players</h2>
         <p className="sub">
@@ -291,6 +351,27 @@ export default function Leaderboard() {
                   <td style={{ color: "var(--text-dim)" }}>
                     {formatDate(p.lastPlayed)}
                   </td>
+                </tr>
+              ))}
+              {pendingPlayers.map((n) => (
+                <tr key={n}>
+                  <td>
+                    <Link
+                      className="player-link"
+                      to={`/player/${encodeURIComponent(n)}`}
+                    >
+                      {n}
+                    </Link>
+                    <Trophy player={n} />
+                  </td>
+                  <td className="num">0</td>
+                  <td className="num" style={{ color: "var(--green)" }}>0</td>
+                  <td className="num" style={{ color: "var(--red)" }}>0</td>
+                  <td className="num">—</td>
+                  <td>
+                    <span className="badge neutral">{RATED_MIN} more matches</span>
+                  </td>
+                  <td style={{ color: "var(--text-dim)" }}>—</td>
                 </tr>
               ))}
             </tbody>

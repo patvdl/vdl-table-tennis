@@ -31,6 +31,8 @@ export interface DataStore {
   loadPlayers(): Promise<PlayerProfile[]>;
   /** Set a player's profile photo (data URL); null removes it */
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
+  /** Register a brand-new player (no matches yet) */
+  addPlayer(name: string): Promise<void>;
 }
 
 type SeedRow = [string, string, string, number, (string | null)?, (string | null)?];
@@ -115,7 +117,7 @@ const localStore: DataStore = {
   async loadPlayers() {
     try {
       const raw = localStorage.getItem(LOCAL_P_KEY);
-      const rec = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
       return Object.entries(rec).map(([name, avatar]) => ({ name, avatar }));
     } catch {
       return [];
@@ -123,9 +125,15 @@ const localStore: DataStore = {
   },
   async setPlayerAvatar(name, avatar) {
     const raw = localStorage.getItem(LOCAL_P_KEY);
-    const rec = raw ? (JSON.parse(raw) as Record<string, string>) : {};
-    if (avatar) rec[name] = avatar;
-    else delete rec[name];
+    const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
+    rec[name] = avatar;
+    localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
+  },
+  async addPlayer(name) {
+    const raw = localStorage.getItem(LOCAL_P_KEY);
+    const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
+    if (name in rec) throw new Error("That player already exists.");
+    rec[name] = null;
     localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
   },
 };
@@ -205,13 +213,12 @@ function makeSupabaseStore(): DataStore {
       }));
     },
     async setPlayerAvatar(name, avatar) {
-      if (avatar) {
-        const { error } = await sb.from("players").upsert({ name, avatar });
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await sb.from("players").delete().eq("name", name);
-        if (error) throw new Error(error.message);
-      }
+      const { error } = await sb.from("players").upsert({ name, avatar });
+      if (error) throw new Error(error.message);
+    },
+    async addPlayer(name) {
+      const { error } = await sb.from("players").insert({ name });
+      if (error) throw new Error(error.message);
     },
   };
 }

@@ -32,6 +32,7 @@ interface MatchesState {
   /** Profile photos by player name (players without one use the letter placeholder) */
   avatars: Map<string, string>;
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
+  addPlayer(name: string): Promise<void>;
   addMatch(m: NewMatch): Promise<void>;
   removeMatch(id: string): Promise<void>;
   addTournament(name: string, date: string): Promise<void>;
@@ -83,9 +84,16 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     () => unratedPlayers(replayResult.stats),
     [replayResult],
   );
+  // Everyone who has played a match, plus manually registered players
   const playerNames = useMemo(
-    () => [...replayResult.stats.keys()].sort((a, b) => a.localeCompare(b)),
-    [replayResult],
+    () =>
+      [
+        ...new Set([
+          ...replayResult.stats.keys(),
+          ...playerRows.map((p) => p.name),
+        ]),
+      ].sort((a, b) => a.localeCompare(b)),
+    [replayResult, playerRows],
   );
 
   const tournaments = useMemo<TournamentSummary[]>(
@@ -124,6 +132,10 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     avatars,
     async setPlayerAvatar(name, avatar) {
       await store.setPlayerAvatar(name, avatar);
+      await refresh();
+    },
+    async addPlayer(name) {
+      await store.addPlayer(name);
       await refresh();
     },
     async addMatch(m) {
