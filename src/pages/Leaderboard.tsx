@@ -85,6 +85,7 @@ export default function Leaderboard() {
   const [addBusy, setAddBusy] = useState(false);
   const [addMsg, setAddMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [trashBusy, setTrashBusy] = useState<string | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
 
   const onRestore = async (name: string) => {
     setTrashBusy(name);
@@ -438,9 +439,37 @@ export default function Leaderboard() {
       </div>
     )}
 
-    {role === "admin" && trash.length > 0 && (
+    {role === "admin" && trash.length > 0 && !showTrash && (
+      <div style={{ textAlign: "center", marginTop: 2 }}>
+        <button
+          onClick={() => setShowTrash(true)}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--text-dim)",
+            fontSize: 12,
+            cursor: "pointer",
+            padding: "6px 10px",
+            opacity: 0.7,
+          }}
+        >
+          Recently deleted ({trash.length})
+        </button>
+      </div>
+    )}
+
+    {role === "admin" && trash.length > 0 && showTrash && (
       <div className="card">
-        <h2>Recently deleted</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+          <h2>Recently deleted</h2>
+          <button
+            className="btn ghost"
+            style={{ padding: "4px 12px", fontSize: 12 }}
+            onClick={() => setShowTrash(false)}
+          >
+            Hide
+          </button>
+        </div>
         <p className="sub">
           Deleted players can be restored for {TRASH_DAYS} days — matches, ratings and
           photo come back exactly as they were. After that, the data is removed permanently.
