@@ -58,6 +58,13 @@ export interface PlayerProfile {
   avatar: string | null;
 }
 
+/** A soft-deleted player waiting in the 30-day restore window */
+export interface DeletedPlayer {
+  name: string;
+  matchCount: number;
+  deletedAt: string; // ISO timestamp
+}
+
 export interface Tournament {
   id: string;
   /** Label carried by this tournament's matches, e.g. "Christmas 2024" */

@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import type { Match, PlayerProfile, Tournament } from "../types";
+import type { DeletedPlayer, Match, PlayerProfile, Tournament } from "../types";
 import seedRaw from "../data/seed-matches.json";
 
 export type StoreMode = "supabase" | "local";
@@ -35,9 +35,22 @@ export interface DataStore {
   addPlayer(name: string): Promise<void>;
   /** Rename a player everywhere: matches, profile photo, tournament brackets */
   renamePlayer(oldName: string, newName: string): Promise<void>;
-  /** Delete a player and every match they played */
+  /**
+   * Delete a player and every match they played. If they had matches, the
+   * data is kept in a trash store for TRASH_DAYS so it can be restored.
+   */
   removePlayer(name: string): Promise<void>;
+  /** Soft-deleted players still inside the restore window (expired ones are purged) */
+  loadTrash(): Promise<DeletedPlayer[]>;
+  /** Bring back a soft-deleted player with all their matches and photo */
+  restorePlayer(name: string): Promise<void>;
+  /** Permanently discard a soft-deleted player's data right now */
+  purgeDeletedPlayer(name: string): Promise<void>;
 }
+
+/** How long deleted players can be restored before their data is gone for good */
+export const TRASH_DAYS = 30;
+const TRASH_MS = TRASH_DAYS * 24 * 60 * 60 * 1000;
 
 type SeedRow = [string, string, string, number, (string | null)?, (string | null)?];
 
@@ -57,6 +70,28 @@ function seedMatches(): Match[] {
 const LOCAL_KEY = "vdl-tt-matches-v2";
 const LOCAL_T_KEY = "vdl-tt-tournaments-v1";
 const LOCAL_P_KEY = "vdl-tt-avatars-v1";
+const LOCAL_D_KEY = "vdl-tt-trash-v1";
+
+/** Full snapshot of a deleted player, enough to restore them completely */
+interface TrashEntry {
+  name: string;
+  avatar: string | null;
+  matches: Match[];
+  deletedAt: string;
+}
+
+function readTrash(): TrashEntry[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_D_KEY);
+    return raw ? (JSON.parse(raw) as TrashEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeTrash(entries: TrashEntry[]) {
+  localStorage.setItem(LOCAL_D_KEY, JSON.stringify(entries));
+}
 
 const localStore: DataStore = {
   mode: "local",
@@ -162,17 +197,80 @@ const localStore: DataStore = {
         : t,
     );
     localStorage.setItem(LOCAL_T_KEY, JSON.stringify(ts));
+
+    // Keep trashed snapshots consistent so a later restore uses the new name
+    writeTrash(
+      readTrash().map((t) => ({
+        ...t,
+        matches: t.matches.map((m) => ({
+          ...m,
+          player1: m.player1 === oldName ? newName : m.player1,
+          player2: m.player2 === oldName ? newName : m.player2,
+        })),
+      })),
+    );
   },
   async removePlayer(name) {
-    const all = (await this.load()).filter(
-      (m) => m.player1 !== name && m.player2 !== name,
-    );
+    const all = await this.load();
+    const mine = all.filter((m) => m.player1 === name || m.player2 === name);
+    const rest = all.filter((m) => m.player1 !== name && m.player2 !== name);
+
+    const raw = localStorage.getItem(LOCAL_P_KEY);
+    const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
+
+    // Only players with recorded matches get a restore window
+    if (mine.length > 0) {
+      const trash = readTrash().filter((t) => t.name !== name);
+      trash.push({
+        name,
+        avatar: rec[name] ?? null,
+        matches: mine,
+        deletedAt: new Date().toISOString(),
+      });
+      writeTrash(trash);
+    }
+
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(rest));
+    delete rec[name];
+    localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
+  },
+  async loadTrash() {
+    const all = readTrash();
+    const cutoff = Date.now() - TRASH_MS;
+    const keep = all.filter((t) => Date.parse(t.deletedAt) >= cutoff);
+    if (keep.length !== all.length) writeTrash(keep); // lazy 30-day purge
+    return keep.map((t) => ({
+      name: t.name,
+      matchCount: t.matches.length,
+      deletedAt: t.deletedAt,
+    }));
+  },
+  async restorePlayer(name) {
+    const trash = readTrash();
+    const entry = trash.find((t) => t.name === name);
+    if (!entry) throw new Error("Nothing to restore for that player.");
+
+    const all = await this.load();
+    const ids = new Set(all.map((m) => m.id));
+    const seqs = new Set(all.map((m) => m.seq));
+    let nextSeq = all.reduce((mx, m) => Math.max(mx, m.seq), 0) + 1;
+    for (const m of entry.matches) {
+      if (ids.has(m.id)) continue;
+      // matches added since the deletion may have reused seq numbers
+      all.push(seqs.has(m.seq) ? { ...m, seq: nextSeq++ } : m);
+    }
+    all.sort((a, b) => a.seq - b.seq);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
 
     const raw = localStorage.getItem(LOCAL_P_KEY);
     const rec = raw ? (JSON.parse(raw) as Record<string, string | null>) : {};
-    delete rec[name];
+    if (entry.avatar || !(name in rec)) rec[name] = entry.avatar;
     localStorage.setItem(LOCAL_P_KEY, JSON.stringify(rec));
+
+    writeTrash(trash.filter((t) => t.name !== name));
+  },
+  async purgeDeletedPlayer(name) {
+    writeTrash(readTrash().filter((t) => t.name !== name));
   },
 };
 
@@ -277,14 +375,98 @@ function makeSupabaseStore(): DataStore {
           if (u.error) throw new Error(u.error.message);
         }
       }
+
+      // Keep trashed snapshots consistent so a later restore uses the new name
+      const dp = await sb.from("deleted_players").select("name, matches");
+      if (!dp.error) {
+        for (const row of dp.data ?? []) {
+          if (!Array.isArray(row.matches)) continue;
+          const rows = row.matches as Record<string, unknown>[];
+          if (!rows.some((m) => m.player1 === oldName || m.player2 === oldName)) continue;
+          const matches = rows.map((m) => ({
+            ...m,
+            player1: m.player1 === oldName ? newName : m.player1,
+            player2: m.player2 === oldName ? newName : m.player2,
+          }));
+          const u = await sb.from("deleted_players").update({ matches }).eq("name", row.name);
+          if (u.error) throw new Error(u.error.message);
+        }
+      }
     },
     async removePlayer(name) {
+      // Snapshot everything first so the delete is recoverable
+      const [r1, r2] = await Promise.all([
+        sb.from("matches").select("*").eq("player1", name),
+        sb.from("matches").select("*").eq("player2", name),
+      ]);
+      if (r1.error) throw new Error(r1.error.message);
+      if (r2.error) throw new Error(r2.error.message);
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const row of [...(r1.data ?? []), ...(r2.data ?? [])]) byId.set(String(row.id), row);
+      const mine = [...byId.values()];
+
+      if (mine.length > 0) {
+        const { data: prow } = await sb
+          .from("players")
+          .select("avatar")
+          .eq("name", name)
+          .maybeSingle();
+        const t = await sb.from("deleted_players").upsert({
+          name,
+          avatar: prow?.avatar ?? null,
+          matches: mine,
+          deleted_at: new Date().toISOString(),
+        });
+        if (t.error) throw new Error(t.error.message);
+      }
+
       let r = await sb.from("matches").delete().eq("player1", name);
       if (r.error) throw new Error(r.error.message);
       r = await sb.from("matches").delete().eq("player2", name);
       if (r.error) throw new Error(r.error.message);
       r = await sb.from("players").delete().eq("name", name);
       if (r.error) throw new Error(r.error.message);
+    },
+    async loadTrash() {
+      // Lazy 30-day purge; silently affects 0 rows for non-admins (RLS)
+      const cutoff = new Date(Date.now() - TRASH_MS).toISOString();
+      await sb.from("deleted_players").delete().lt("deleted_at", cutoff);
+
+      const { data, error } = await sb
+        .from("deleted_players")
+        .select("name, deleted_at, matches")
+        .order("deleted_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => ({
+        name: String(r.name),
+        matchCount: Array.isArray(r.matches) ? r.matches.length : 0,
+        deletedAt: String(r.deleted_at),
+      }));
+    },
+    async restorePlayer(name) {
+      const { data: entry, error } = await sb
+        .from("deleted_players")
+        .select("*")
+        .eq("name", name)
+        .single();
+      if (error) throw new Error(error.message);
+
+      const rows = Array.isArray(entry.matches)
+        ? (entry.matches as Record<string, unknown>[])
+        : [];
+      if (rows.length > 0) {
+        const m = await sb.from("matches").upsert(rows, { onConflict: "id" });
+        if (m.error) throw new Error(m.error.message);
+      }
+      const p = await sb.from("players").upsert({ name, avatar: entry.avatar ?? null });
+      if (p.error) throw new Error(p.error.message);
+
+      const d = await sb.from("deleted_players").delete().eq("name", name);
+      if (d.error) throw new Error(d.error.message);
+    },
+    async purgeDeletedPlayer(name) {
+      const { error } = await sb.from("deleted_players").delete().eq("name", name);
+      if (error) throw new Error(error.message);
     },
   };
 }

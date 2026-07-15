@@ -10,7 +10,13 @@ import {
 import { store, type NewMatch } from "./store";
 import { replay, leaderboard, unratedPlayers, type ReplayResult } from "../lib/elo";
 import { analyzeTournament, type TournamentAnalysis } from "../lib/bracket";
-import type { Match, PlayerProfile, PlayerStats, Tournament } from "../types";
+import type {
+  DeletedPlayer,
+  Match,
+  PlayerProfile,
+  PlayerStats,
+  Tournament,
+} from "../types";
 
 export interface TournamentSummary extends Tournament {
   analysis: TournamentAnalysis;
@@ -31,10 +37,14 @@ interface MatchesState {
   tournaments: TournamentSummary[];
   /** Profile photos by player name (players without one use the letter placeholder) */
   avatars: Map<string, string>;
+  /** Soft-deleted players still inside their 30-day restore window */
+  trash: DeletedPlayer[];
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
   addPlayer(name: string): Promise<void>;
   renamePlayer(oldName: string, newName: string): Promise<void>;
   removePlayer(name: string): Promise<void>;
+  restorePlayer(name: string): Promise<void>;
+  purgeDeletedPlayer(name: string): Promise<void>;
   addMatch(m: NewMatch): Promise<void>;
   removeMatch(id: string): Promise<void>;
   addTournament(name: string, date: string): Promise<void>;
@@ -50,6 +60,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [tournamentRows, setTournamentRows] = useState<Tournament[]>([]);
   const [playerRows, setPlayerRows] = useState<PlayerProfile[]>([]);
+  const [trash, setTrash] = useState<DeletedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +79,12 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
       } catch {
         // Avatars are non-critical; letter placeholders cover everyone
         setPlayerRows([]);
+      }
+      try {
+        setTrash(await store.loadTrash());
+      } catch {
+        // Trash is non-critical (and hidden from non-admins anyway)
+        setTrash([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -132,6 +149,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     playerNames,
     tournaments,
     avatars,
+    trash,
     async setPlayerAvatar(name, avatar) {
       await store.setPlayerAvatar(name, avatar);
       await refresh();
@@ -146,6 +164,14 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     },
     async removePlayer(name) {
       await store.removePlayer(name);
+      await refresh();
+    },
+    async restorePlayer(name) {
+      await store.restorePlayer(name);
+      await refresh();
+    },
+    async purgeDeletedPlayer(name) {
+      await store.purgeDeletedPlayer(name);
       await refresh();
     },
     async addMatch(m) {

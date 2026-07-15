@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
+import { TRASH_DAYS } from "../store/store";
 import { RATED_MIN, replay, leaderboard, unratedPlayers } from "../lib/elo";
 import { formatDate, round0, pct } from "../lib/format";
 import type { PlayerStats } from "../types";
@@ -64,7 +65,17 @@ function sortValue(p: PlayerStats, key: SortKey): string | number {
 }
 
 export default function Leaderboard() {
-  const { board, unratedBoard, matches, playerNames, replayResult, addPlayer } = useMatches();
+  const {
+    board,
+    unratedBoard,
+    matches,
+    playerNames,
+    replayResult,
+    addPlayer,
+    trash,
+    restorePlayer,
+    purgeDeletedPlayer,
+  } = useMatches();
   const { role } = useAuth();
   const [sortKey, setSortKey] = useState<SortKey>("rating");
   const [dir, setDir] = useState<1 | -1>(-1);
@@ -73,6 +84,35 @@ export default function Leaderboard() {
   const [newPlayer, setNewPlayer] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addMsg, setAddMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [trashBusy, setTrashBusy] = useState<string | null>(null);
+
+  const onRestore = async (name: string) => {
+    setTrashBusy(name);
+    try {
+      await restorePlayer(name);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrashBusy(null);
+    }
+  };
+
+  const onPurge = async (name: string, matchCount: number) => {
+    if (
+      !confirm(
+        `Permanently delete ${name} and their ${matchCount} ${matchCount === 1 ? "match" : "matches"} right now?\n\nThis cannot be undone.`,
+      )
+    )
+      return;
+    setTrashBusy(name);
+    try {
+      await purgeDeletedPlayer(name);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTrashBusy(null);
+    }
+  };
 
   // Registered players who haven't played a match yet
   const pendingPlayers = useMemo(
@@ -392,6 +432,72 @@ export default function Leaderboard() {
                   )}
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+
+    {role === "admin" && trash.length > 0 && (
+      <div className="card">
+        <h2>Recently deleted</h2>
+        <p className="sub">
+          Deleted players can be restored for {TRASH_DAYS} days — matches, ratings and
+          photo come back exactly as they were. After that, the data is removed permanently.
+        </p>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th className="num">Matches</th>
+                <th>Deleted</th>
+                <th>Time left</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {trash.map((t) => {
+                const daysLeft = Math.max(
+                  0,
+                  Math.ceil(
+                    (Date.parse(t.deletedAt) + TRASH_DAYS * 86400000 - Date.now()) /
+                      86400000,
+                  ),
+                );
+                const busy = trashBusy === t.name;
+                return (
+                  <tr key={t.name}>
+                    <td>{t.name}</td>
+                    <td className="num">{t.matchCount}</td>
+                    <td style={{ color: "var(--text-dim)" }}>
+                      {formatDate(t.deletedAt.slice(0, 10))}
+                    </td>
+                    <td>
+                      <span className={`badge ${daysLeft <= 5 ? "down" : "neutral"}`}>
+                        {daysLeft} {daysLeft === 1 ? "day" : "days"}
+                      </span>
+                    </td>
+                    <td className="actions-cell">
+                      <button
+                        className="btn ghost"
+                        style={{ padding: "4px 12px", fontSize: 12, marginRight: 8 }}
+                        disabled={busy}
+                        onClick={() => onRestore(t.name)}
+                      >
+                        {busy ? "…" : "Restore"}
+                      </button>
+                      <button
+                        className="btn danger"
+                        disabled={busy}
+                        onClick={() => onPurge(t.name, t.matchCount)}
+                      >
+                        Delete now
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -46,6 +46,16 @@ create table if not exists public.players (
   updated_at timestamptz not null default now()
 );
 
+-- ============ deleted players (30-day restore window) ============
+create table if not exists public.deleted_players (
+  name text primary key,
+  -- profile photo at the time of deletion, restored with the player
+  avatar text,
+  -- full snapshot of the player's match rows, restored verbatim
+  matches jsonb not null default '[]'::jsonb,
+  deleted_at timestamptz not null default now()
+);
+
 -- ============ profiles (roles) ============
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -89,6 +99,14 @@ alter table public.matches enable row level security;
 alter table public.profiles enable row level security;
 alter table public.tournaments enable row level security;
 alter table public.players enable row level security;
+alter table public.deleted_players enable row level security;
+
+-- Trash is admin-only: reading, restoring and purging
+drop policy if exists "admins manage deleted players" on public.deleted_players;
+create policy "admins manage deleted players"
+  on public.deleted_players for all
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- Everyone can see profile photos; only admins can manage them
 drop policy if exists "players are public to read" on public.players;

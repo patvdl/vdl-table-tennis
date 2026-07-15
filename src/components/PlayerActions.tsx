@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
+import { TRASH_DAYS } from "../store/store";
 import { fileToAvatar } from "../lib/image";
 import Avatar from "./Avatar";
 
@@ -49,8 +50,8 @@ export default function PlayerActions({ player, onRenamed, onDeleted }: Props) {
     const count = matches.filter((m) => m.player1 === player || m.player2 === player).length;
     const warning =
       count > 0
-        ? `Are you sure you want to delete ${player}?\n\nThis permanently removes them and all ${count} of their ${count === 1 ? "match" : "matches"}. Everyone's ratings are recalculated as if those matches never happened. This cannot be undone.`
-        : `Are you sure you want to delete ${player}?\n\nThey have no matches yet, so nothing else is affected.`;
+        ? `Are you sure you want to delete ${player}?\n\nThis removes them and all ${count} of their ${count === 1 ? "match" : "matches"}. Everyone's ratings are recalculated as if those matches never happened.\n\nIf this is a mistake, an admin can restore them from the leaderboard's "Recently deleted" section for ${TRASH_DAYS} days. After that, the data is gone for good.`
+        : `Are you sure you want to delete ${player}?\n\nThey have no matches yet, so nothing else is affected and there is nothing to restore later.`;
     if (!confirm(warning)) return;
     setBusy(true);
     try {
