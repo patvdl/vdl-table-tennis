@@ -4,6 +4,7 @@ import { useMatches } from "../store/matches";
 import { headToHead, RATED_MIN, START_RATING } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
+import FormChart from "../components/FormChart";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import Delta from "../components/Delta";
@@ -31,13 +32,12 @@ export default function PlayerPage() {
   const rank = board.findIndex((p) => p.name === player) + 1;
   const [showAllMatches, setShowAllMatches] = useState(false);
 
-  const myMatches = useMemo(
-    () =>
-      [...replayResult.enriched]
-        .reverse() // newest first
-        .filter((m) => m.player1 === player || m.player2 === player),
+  // Oldest first, for the form chart
+  const chronological = useMemo(
+    () => replayResult.enriched.filter((m) => m.player1 === player || m.player2 === player),
     [player, replayResult],
   );
+  const myMatches = useMemo(() => [...chronological].reverse(), [chronological]); // newest first
 
   const rivals = useMemo(() => {
     if (!stats) return [];
@@ -186,6 +186,14 @@ export default function PlayerPage() {
           <div style={{ marginTop: 18 }}>
             <label className="field">Rating over time ({stats.played} matches)</label>
             <Sparkline values={stats.history} width={640} height={80} />
+          </div>
+        )}
+        {isRated && (
+          <div style={{ marginTop: 18 }}>
+            <label className="field">
+              Career form — wins {stats.wins} · losses {stats.losses}
+            </label>
+            <FormChart matches={chronological} player={player} />
           </div>
         )}
       </div>
