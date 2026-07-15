@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { computeRecords } from "../lib/records";
+import type { StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
 import { formatDate, round0 } from "../lib/format";
 import Avatar from "../components/Avatar";
@@ -40,9 +41,22 @@ function Hero({
   );
 }
 
+/** Keep only each player's first (= best, lists are sorted) entry */
+function bestPerPlayer(list: StreakRecord[]): StreakRecord[] {
+  const seen = new Set<string>();
+  return list.filter((s) => (seen.has(s.player) ? false : (seen.add(s.player), true)));
+}
+
 export default function Records() {
   const { replayResult } = useMatches();
   const records = useMemo(() => computeRecords(replayResult.enriched), [replayResult]);
+
+  const [uniqueWins, setUniqueWins] = useState(false);
+  const [uniqueLosses, setUniqueLosses] = useState(false);
+  const [expandedKiller, setExpandedKiller] = useState<string | null>(null);
+
+  const winList = uniqueWins ? bestPerPlayer(records.winStreaks) : records.winStreaks;
+  const lossList = uniqueLosses ? bestPerPlayer(records.lossStreaks) : records.lossStreaks;
 
   const topWin = records.winStreaks[0];
   const topLoss = records.lossStreaks[0];
@@ -52,6 +66,9 @@ export default function Records() {
   const topReign = records.reigns[0];
   const topFive = records.topFive[0];
   const topKiller = records.giantKillers[0];
+  const killerLeaders = topKiller
+    ? records.giantKillers.filter((g) => g.wins === topKiller.wins)
+    : [];
 
   const streakWhen = (s: { start: string; end: string | null }) =>
     `${formatDate(s.start)} → ${s.end ? formatDate(s.end) : "still active"}`;
@@ -59,10 +76,20 @@ export default function Records() {
   return (
     <div className="records-grid">
       <div className="card">
-        <h2>Longest win streak</h2>
+        <div className="card-head">
+          <h2>Longest win streak</h2>
+          <button
+            className="btn ghost"
+            style={{ padding: "3px 10px", fontSize: 11 }}
+            onClick={() => setUniqueWins((v) => !v)}
+          >
+            {uniqueWins ? "Show every streak" : "Best per player"}
+          </button>
+        </div>
         <p className="sub">
-          Most consecutive wins against anyone. Every run counts on its own, so one
-          player can hold several spots.
+          {uniqueWins
+            ? "Each player's single best run of consecutive wins."
+            : "Most consecutive wins against anyone. Every run counts on its own, so one player can hold several spots."}
         </p>
         {topWin ? (
           <>
@@ -75,7 +102,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.winStreaks.slice(0, TOP_N).map((s, i) => (
+                  {winList.slice(0, TOP_N).map((s, i) => (
                     <tr key={i}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
@@ -97,10 +124,20 @@ export default function Records() {
       </div>
 
       <div className="card">
-        <h2>Longest losing streak</h2>
+        <div className="card-head">
+          <h2>Longest losing streak</h2>
+          <button
+            className="btn ghost"
+            style={{ padding: "3px 10px", fontSize: 11 }}
+            onClick={() => setUniqueLosses((v) => !v)}
+          >
+            {uniqueLosses ? "Show every streak" : "Best per player"}
+          </button>
+        </div>
         <p className="sub">
-          Most consecutive losses against anyone. Every run counts on its own, so one
-          player can hold several spots.
+          {uniqueLosses
+            ? "Each player's single worst run of consecutive losses."
+            : "Most consecutive losses against anyone. Every run counts on its own, so one player can hold several spots."}
         </p>
         {topLoss ? (
           <>
@@ -113,7 +150,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.lossStreaks.slice(0, TOP_N).map((s, i) => (
+                  {lossList.slice(0, TOP_N).map((s, i) => (
                     <tr key={i}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
@@ -186,29 +223,110 @@ export default function Records() {
         </p>
         {topKiller ? (
           <>
-            <Hero
-              player={topKiller.player}
-              value={`${topKiller.wins} ${topKiller.wins === 1 ? "win" : "wins"}`}
-              context={`${topKiller.victims
-                .map((v) => `${v.count}× vs ${v.name}`)
-                .join(" · ")} · latest ${formatDate(topKiller.latest)}`}
-            />
+            {killerLeaders.length > 1 ? (
+              <div className="record-hero">
+                <div style={{ display: "flex" }}>
+                  {killerLeaders.map((g, i) => (
+                    <span
+                      key={g.player}
+                      style={{
+                        position: "relative",
+                        marginLeft: i ? -16 : 0,
+                        zIndex: killerLeaders.length - i,
+                      }}
+                    >
+                      <Avatar player={g.player} size={64} />
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <div className="record-value">
+                    {topKiller.wins} wins each{" "}
+                    <span className="badge neutral" style={{ verticalAlign: "middle" }}>
+                      tied
+                    </span>
+                  </div>
+                  <div className="record-context">
+                    {killerLeaders.map((g, i) => (
+                      <Fragment key={g.player}>
+                        {i > 0 && (i === killerLeaders.length - 1 ? " and " : ", ")}
+                        <PlayerLink name={g.player} />
+                      </Fragment>
+                    ))}{" "}
+                    share the record
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Hero
+                player={topKiller.player}
+                value={`${topKiller.wins} ${topKiller.wins === 1 ? "win" : "wins"}`}
+                context={`${topKiller.victims
+                  .map((v) => `${v.count}× vs ${v.name}`)
+                  .join(" · ")} · latest ${formatDate(topKiller.latest)}`}
+              />
+            )}
             <div className="table-wrap">
               <table>
                 <tbody>
                   {records.giantKillers.slice(0, TOP_N).map((g, i) => (
-                    <tr key={g.player}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={g.player} />
-                      </td>
-                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                        {g.wins} {g.wins === 1 ? "win" : "wins"}
-                      </td>
-                      <td style={{ color: "var(--text-dim)" }}>
-                        latest {formatDate(g.latest)}
-                      </td>
-                    </tr>
+                    <Fragment key={g.player}>
+                      <tr>
+                        <td className="rank-cell">{i + 1}</td>
+                        <td>
+                          <PlayerLink name={g.player} />
+                        </td>
+                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                          {g.wins} {g.wins === 1 ? "win" : "wins"}
+                        </td>
+                        <td style={{ color: "var(--text-dim)" }}>
+                          latest {formatDate(g.latest)}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn ghost"
+                            style={{ padding: "2px 10px", fontSize: 11 }}
+                            onClick={() =>
+                              setExpandedKiller(expandedKiller === g.player ? null : g.player)
+                            }
+                          >
+                            {expandedKiller === g.player ? "Hide" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedKiller === g.player && (
+                        <tr>
+                          <td />
+                          <td colSpan={4}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 4,
+                                padding: "2px 0 10px",
+                                fontSize: 13,
+                                color: "var(--text-dim)",
+                              }}
+                            >
+                              {g.victories.map((v) => (
+                                <div key={v.id}>
+                                  {formatDate(v.date)} — beat{" "}
+                                  <PlayerLink name={v.loserName} />
+                                  {v.score ? ` ${v.score}` : ""}
+                                  {v.tournament && (
+                                    <span
+                                      className="badge gold"
+                                      style={{ marginLeft: 8, fontSize: 11 }}
+                                    >
+                                      🏆 {v.tournament}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

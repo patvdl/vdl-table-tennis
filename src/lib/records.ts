@@ -32,6 +32,8 @@ export interface GiantKillerRecord {
   latest: string;
   /** Breakdown per reigning-#1 victim, most beaten first */
   victims: { name: string; count: number }[];
+  /** The individual wins, chronological — the loser was the reigning #1 */
+  victories: EnrichedMatch[];
 }
 
 export interface UpsetRecord {
@@ -113,7 +115,13 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
   const daysAtTop = new Map<string, number>();
   const reignCounts = new Map<string, number>();
   const daysTop5 = new Map<string, number>();
-  const kills = new Map<string, { wins: number; latest: string; victims: Map<string, number> }>();
+  type KillTally = {
+    wins: number;
+    latest: string;
+    victims: Map<string, number>;
+    victories: EnrichedMatch[];
+  };
+  const kills = new Map<string, KillTally>();
   let holder: string | null = null;
   let holderSince: string | null = null;
   let currentTop5: string[] = [];
@@ -126,10 +134,16 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
     if (holder) {
       for (const m of byDate.get(date) ?? []) {
         if (m.loserName !== holder) continue;
-        const k = kills.get(m.winnerName) ?? { wins: 0, latest: m.date, victims: new Map() };
+        const k: KillTally = kills.get(m.winnerName) ?? {
+          wins: 0,
+          latest: m.date,
+          victims: new Map(),
+          victories: [],
+        };
         k.wins++;
         k.latest = m.date;
         k.victims.set(holder, (k.victims.get(holder) ?? 0) + 1);
+        k.victories.push(m);
         kills.set(m.winnerName, k);
       }
     }
@@ -180,6 +194,7 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
       victims: [...k.victims.entries()]
         .map(([victim, count]) => ({ name: victim, count }))
         .sort((a, b) => b.count - a.count),
+      victories: k.victories,
     }))
     .sort((a, b) => b.wins - a.wins || a.latest.localeCompare(b.latest));
 

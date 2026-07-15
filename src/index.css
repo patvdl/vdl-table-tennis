@@ -675,6 +675,13 @@ input[type="checkbox"]:checked::after {
 }
 
 /* ---------- records ---------- */
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .records-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
