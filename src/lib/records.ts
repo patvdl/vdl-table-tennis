@@ -18,6 +18,22 @@ export interface StreakRecord {
   end: string | null;
 }
 
+export interface TopFiveRecord {
+  player: string;
+  /** Total full days spent ranked in the top 5 */
+  days: number;
+  current: boolean;
+}
+
+export interface GiantKillerRecord {
+  player: string;
+  /** Career wins over whoever was ranked #1 at the time */
+  wins: number;
+  latest: string;
+  /** Breakdown per reigning-#1 victim, most beaten first */
+  victims: { name: string; count: number }[];
+}
+
 export interface UpsetRecord {
   match: EnrichedMatch;
   winner: string;
@@ -46,12 +62,14 @@ export interface ReignRecord {
 }
 
 export interface RecordBook {
-  winStreaks: StreakRecord[]; // per player best, longest first
-  lossStreaks: StreakRecord[]; // per player worst, longest first
+  winStreaks: StreakRecord[]; // every individual run, longest first
+  lossStreaks: StreakRecord[]; // every individual run, longest first
   upsets: UpsetRecord[]; // most improbable winner first
   highest: RatingExtreme[]; // per player highest ever, best first
   lowest: RatingExtreme[]; // per player lowest ever, worst first
   reigns: ReignRecord[]; // most days at #1 first
+  topFive: TopFiveRecord[]; // most days ranked in the top 5 first
+  giantKillers: GiantKillerRecord[]; // most wins over reigning #1s first
 }
 
 function pairKey(a: string, b: string): string {
@@ -70,23 +88,55 @@ function todayIso(): string {
 }
 
 /**
- * Days spent at #1: for every date on which matches were played, rebuild
- * the standings as they stood at the end of that day (same replay the
- * historical leaderboard view uses — the match log's seq order is not
- * strictly date-ordered, so we can't just walk it linearly) and credit
- * the #1 with the days until the standings next changed.
+ * Records that depend on the standings over time: for every date on which
+ * matches were played, rebuild the leaderboard as it stood at the end of
+ * that day (same replay the historical leaderboard view uses — the match
+ * log's seq order is not strictly date-ordered, so we can't just walk it
+ * linearly). From that one pass we get:
+ * - days spent at #1 (the day's #1 holds it until the standings next change)
+ * - days spent ranked in the top 5
+ * - wins over the reigning #1 (the #1 going into that day's play)
  */
-function computeReigns(enriched: EnrichedMatch[]): ReignRecord[] {
+function computeStandingsRecords(enriched: EnrichedMatch[]): {
+  reigns: ReignRecord[];
+  topFive: TopFiveRecord[];
+  giantKillers: GiantKillerRecord[];
+} {
   const dates = [...new Set(enriched.map((m) => m.date))].sort();
+  const byDate = new Map<string, EnrichedMatch[]>();
+  for (const m of enriched) {
+    const list = byDate.get(m.date) ?? [];
+    list.push(m);
+    byDate.set(m.date, list);
+  }
+
   const daysAtTop = new Map<string, number>();
   const reignCounts = new Map<string, number>();
+  const daysTop5 = new Map<string, number>();
+  const kills = new Map<string, { wins: number; latest: string; victims: Map<string, number> }>();
   let holder: string | null = null;
   let holderSince: string | null = null;
+  let currentTop5: string[] = [];
 
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
+
+    // Wins over the #1: `holder` is still the reigning #1 going into
+    // this day's play (standings update after the day's matches).
+    if (holder) {
+      for (const m of byDate.get(date) ?? []) {
+        if (m.loserName !== holder) continue;
+        const k = kills.get(m.winnerName) ?? { wins: 0, latest: m.date, victims: new Map() };
+        k.wins++;
+        k.latest = m.date;
+        k.victims.set(holder, (k.victims.get(holder) ?? 0) + 1);
+        kills.set(m.winnerName, k);
+      }
+    }
+
     const asOf = enriched.filter((m) => m.date <= date);
-    const top = leaderboard(replay(asOf).stats)[0]?.name;
+    const board = leaderboard(replay(asOf).stats);
+    const top = board[0]?.name;
     if (!top) continue; // nobody rated yet
 
     if (top !== holder) {
@@ -95,10 +145,16 @@ function computeReigns(enriched: EnrichedMatch[]): ReignRecord[] {
       reignCounts.set(top, (reignCounts.get(top) ?? 0) + 1);
     }
     const until = i + 1 < dates.length ? dates[i + 1] : todayIso();
-    daysAtTop.set(top, (daysAtTop.get(top) ?? 0) + diffDays(date, until));
+    const span = diffDays(date, until);
+    daysAtTop.set(top, (daysAtTop.get(top) ?? 0) + span);
+
+    currentTop5 = board.slice(0, 5).map((p) => p.name);
+    for (const name of currentTop5) {
+      daysTop5.set(name, (daysTop5.get(name) ?? 0) + span);
+    }
   }
 
-  return [...reignCounts.keys()]
+  const reigns = [...reignCounts.keys()]
     .map((name) => ({
       player: name,
       days: daysAtTop.get(name) ?? 0,
@@ -107,6 +163,27 @@ function computeReigns(enriched: EnrichedMatch[]): ReignRecord[] {
       since: name === holder ? holderSince : null,
     }))
     .sort((a, b) => b.days - a.days || b.reigns - a.reigns);
+
+  const topFive = [...daysTop5.keys()]
+    .map((name) => ({
+      player: name,
+      days: daysTop5.get(name) ?? 0,
+      current: currentTop5.includes(name),
+    }))
+    .sort((a, b) => b.days - a.days);
+
+  const giantKillers = [...kills.entries()]
+    .map(([name, k]) => ({
+      player: name,
+      wins: k.wins,
+      latest: k.latest,
+      victims: [...k.victims.entries()]
+        .map(([victim, count]) => ({ name: victim, count }))
+        .sort((a, b) => b.count - a.count),
+    }))
+    .sort((a, b) => b.wins - a.wins || a.latest.localeCompare(b.latest));
+
+  return { reigns, topFive, giantKillers };
 }
 
 export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
@@ -114,8 +191,8 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const streak = new Map<string, number>(); // >0 win run, <0 loss run
   const winStart = new Map<string, string>();
   const lossStart = new Map<string, string>();
-  const bestWin = new Map<string, StreakRecord>();
-  const bestLoss = new Map<string, StreakRecord>();
+  const winRuns: StreakRecord[] = []; // every completed (or active) run
+  const lossRuns: StreakRecord[] = [];
   const highest = new Map<string, RatingExtreme>();
   const lowest = new Map<string, RatingExtreme>();
   const pairWinners = new Map<string, string[]>(); // chronological winner names
@@ -161,43 +238,38 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
     winners.push(m.winnerName);
     pairWinners.set(key, winners);
 
-    // Win/loss streak records
+    // Streak runs — every run is recorded individually when it ends, so
+    // one player can hold several spots in the top-5 lists.
     const winner = m.winnerName;
     const loser = m.loserName;
     const prevW = streak.get(winner) ?? 0;
     const prevL = streak.get(loser) ?? 0;
 
+    // Winning ends any losing run the winner was on
+    if (prevW < 0) {
+      lossRuns.push({
+        player: winner,
+        length: -prevW,
+        start: lossStart.get(winner) ?? m.date,
+        end: m.date,
+      });
+    }
     const newW = prevW > 0 ? prevW + 1 : 1;
     streak.set(winner, newW);
     if (newW === 1) winStart.set(winner, m.date);
-    const bw = bestWin.get(winner);
-    if (!bw || newW > bw.length) {
-      bestWin.set(winner, {
-        player: winner,
-        length: newW,
-        start: winStart.get(winner) ?? m.date,
-        end: null,
+
+    // Losing ends any winning run the loser was on
+    if (prevL > 0) {
+      winRuns.push({
+        player: loser,
+        length: prevL,
+        start: winStart.get(loser) ?? m.date,
+        end: m.date,
       });
     }
-    // Winning ends any losing run — stamp the end date if it was a record
-    const wl = bestLoss.get(winner);
-    if (prevW < 0 && wl && -prevW === wl.length && wl.end === null) wl.end = m.date;
-
     const newL = prevL < 0 ? prevL - 1 : -1;
     streak.set(loser, newL);
     if (newL === -1) lossStart.set(loser, m.date);
-    const bl = bestLoss.get(loser);
-    if (!bl || -newL > bl.length) {
-      bestLoss.set(loser, {
-        player: loser,
-        length: -newL,
-        start: lossStart.get(loser) ?? m.date,
-        end: null,
-      });
-    }
-    // Losing ends any winning run — stamp the end date if it was a record
-    const lw = bestWin.get(loser);
-    if (prevL > 0 && lw && prevL === lw.length && lw.end === null) lw.end = m.date;
 
     // Rated-moment rating extremes
     played.set(m.player1, played1 + 1);
@@ -214,15 +286,28 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
     consider(m.player2, played2 + 1, m.rating2After);
   }
 
+  // Runs still alive at the end of the log count too
+  for (const [name, s] of streak) {
+    if (s > 0) {
+      winRuns.push({ player: name, length: s, start: winStart.get(name) ?? "", end: null });
+    } else if (s < 0) {
+      lossRuns.push({ player: name, length: -s, start: lossStart.get(name) ?? "", end: null });
+    }
+  }
+
   const byLengthThenStart = (a: StreakRecord, b: StreakRecord) =>
     b.length - a.length || a.start.localeCompare(b.start);
 
+  const { reigns, topFive, giantKillers } = computeStandingsRecords(enriched);
+
   return {
-    winStreaks: [...bestWin.values()].sort(byLengthThenStart),
-    lossStreaks: [...bestLoss.values()].sort(byLengthThenStart),
+    winStreaks: winRuns.sort(byLengthThenStart),
+    lossStreaks: lossRuns.sort(byLengthThenStart),
     upsets: upsets.sort((a, b) => a.winProb - b.winProb),
     highest: [...highest.values()].sort((a, b) => b.rating - a.rating),
     lowest: [...lowest.values()].sort((a, b) => a.rating - b.rating),
-    reigns: computeReigns(enriched),
+    reigns,
+    topFive,
+    giantKillers,
   };
 }

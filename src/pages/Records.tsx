@@ -50,6 +50,8 @@ export default function Records() {
   const topHigh = records.highest[0];
   const topLow = records.lowest[0];
   const topReign = records.reigns[0];
+  const topFive = records.topFive[0];
+  const topKiller = records.giantKillers[0];
 
   const streakWhen = (s: { start: string; end: string | null }) =>
     `${formatDate(s.start)} → ${s.end ? formatDate(s.end) : "still active"}`;
@@ -58,7 +60,10 @@ export default function Records() {
     <div className="records-grid">
       <div className="card">
         <h2>Longest win streak</h2>
-        <p className="sub">Most consecutive wins against anyone, all-time.</p>
+        <p className="sub">
+          Most consecutive wins against anyone. Every run counts on its own, so one
+          player can hold several spots.
+        </p>
         {topWin ? (
           <>
             <Hero
@@ -71,7 +76,7 @@ export default function Records() {
               <table>
                 <tbody>
                   {records.winStreaks.slice(0, TOP_N).map((s, i) => (
-                    <tr key={s.player}>
+                    <tr key={i}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
                         <PlayerLink name={s.player} />
@@ -93,7 +98,10 @@ export default function Records() {
 
       <div className="card">
         <h2>Longest losing streak</h2>
-        <p className="sub">Most consecutive losses against anyone, all-time.</p>
+        <p className="sub">
+          Most consecutive losses against anyone. Every run counts on its own, so one
+          player can hold several spots.
+        </p>
         {topLoss ? (
           <>
             <Hero
@@ -106,7 +114,7 @@ export default function Records() {
               <table>
                 <tbody>
                   {records.lossStreaks.slice(0, TOP_N).map((s, i) => (
-                    <tr key={s.player}>
+                    <tr key={i}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
                         <PlayerLink name={s.player} />
@@ -171,6 +179,47 @@ export default function Records() {
       </div>
 
       <div className="card">
+        <h2>Most wins over the #1</h2>
+        <p className="sub">
+          Career wins against whoever was ranked #1 at the time — beating the best
+          while they were the best.
+        </p>
+        {topKiller ? (
+          <>
+            <Hero
+              player={topKiller.player}
+              value={`${topKiller.wins} ${topKiller.wins === 1 ? "win" : "wins"}`}
+              context={`${topKiller.victims
+                .map((v) => `${v.count}× vs ${v.name}`)
+                .join(" · ")} · latest ${formatDate(topKiller.latest)}`}
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {records.giantKillers.slice(0, TOP_N).map((g, i) => (
+                    <tr key={g.player}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={g.player} />
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {g.wins} {g.wins === 1 ? "win" : "wins"}
+                      </td>
+                      <td style={{ color: "var(--text-dim)" }}>
+                        latest {formatDate(g.latest)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="sub">Nobody has beaten a reigning #1 yet.</p>
+        )}
+      </div>
+
+      <div className="card">
         <h2>Most days at #1</h2>
         <p className="sub">Total days spent holding the top spot on the leaderboard.</p>
         {topReign ? (
@@ -201,6 +250,40 @@ export default function Records() {
                       </td>
                       <td style={{ color: "var(--text-dim)" }}>
                         {r.reigns} {r.reigns === 1 ? "reign" : "reigns"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="sub">Nobody has been ranked yet.</p>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Most days in the top 5</h2>
+        <p className="sub">Total days spent ranked among the leaderboard's top 5 players.</p>
+        {topFive ? (
+          <>
+            <Hero
+              player={topFive.player}
+              value={`${topFive.days} days`}
+              context={topFive.current ? "currently in the top 5" : "not currently in the top 5"}
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {records.topFive.slice(0, TOP_N).map((t, i) => (
+                    <tr key={t.player}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={t.player} />{" "}
+                        {t.current && <span className="badge neutral">current top 5</span>}
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {t.days} {t.days === 1 ? "day" : "days"}
                       </td>
                     </tr>
                   ))}
