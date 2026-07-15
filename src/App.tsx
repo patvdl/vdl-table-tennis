@@ -5,6 +5,7 @@ import Leaderboard from "./pages/Leaderboard";
 import HeadToHeadPage from "./pages/HeadToHead";
 import MatchHistory from "./pages/MatchHistory";
 import Tournaments from "./pages/Tournaments";
+import Records from "./pages/Records";
 import AddMatch from "./pages/AddMatch";
 import PlayerPage from "./pages/Player";
 import SignIn from "./pages/SignIn";
@@ -63,6 +64,7 @@ export default function App() {
         <NavLink to="/head-to-head">Head-to-Head</NavLink>
         <NavLink to="/matches">Match History</NavLink>
         <NavLink to="/tournaments">Tournaments</NavLink>
+        <NavLink to="/records">Records</NavLink>
         {auth.role === "admin" && <NavLink to="/add">Add Match</NavLink>}
       </nav>
 
@@ -78,6 +80,7 @@ export default function App() {
           <Route path="/head-to-head" element={<HeadToHeadPage />} />
           <Route path="/matches" element={<MatchHistory />} />
           <Route path="/tournaments" element={<Tournaments />} />
+          <Route path="/records" element={<Records />} />
           <Route path="/add" element={<AddMatch />} />
           <Route path="/player/:name" element={<PlayerPage />} />
           <Route path="/signin" element={<SignIn />} />

@@ -270,6 +270,39 @@ function predictSets(pA: number): { a: number; b: number } {
   return pA >= 0.5 ? { a: 3, b: loserSets } : { a: loserSets, b: 3 };
 }
 
+/**
+ * Core probability blend used by the win predictor. Takes a snapshot of
+ * the inputs (ratings, current streaks, h2h results newest-first) so it
+ * can also be replayed historically — the records page uses it to ask
+ * "what would the predictor have said before this match, back then?".
+ */
+export function winProbability(
+  ra: number,
+  rb: number,
+  streakA: number,
+  streakB: number,
+  h2hAWonNewestFirst: boolean[],
+): { pA: number; pRating: number; pElo: number } {
+  const pRating = expectedScore(ra, rb);
+
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, v));
+  const formA = clamp(streakA, -FORM_CAP, FORM_CAP) * FORM_POINTS;
+  const formB = clamp(streakB, -FORM_CAP, FORM_CAP) * FORM_POINTS;
+  const pElo = expectedScore(ra + formA, rb + formB);
+
+  let weightedA = 0;
+  let weightedTotal = 0;
+  for (let i = 0; i < h2hAWonNewestFirst.length; i++) {
+    const w = Math.pow(H2H_DECAY, i); // i = matches into the past
+    weightedTotal += w;
+    if (h2hAWonNewestFirst[i]) weightedA += w;
+  }
+
+  const pA = (weightedA + PRIOR_STRENGTH * pElo) / (weightedTotal + PRIOR_STRENGTH);
+  return { pA, pRating, pElo };
+}
+
 export function predictMatch(
   enriched: EnrichedMatch[],
   stats: Map<string, PlayerStats>,
@@ -283,37 +316,23 @@ export function predictMatch(
   const streakA = sa?.streak ?? 0;
   const streakB = sb?.streak ?? 0;
 
-  const pRating = expectedScore(ra, rb);
-
-  const clamp = (v: number, lo: number, hi: number) =>
-    Math.min(hi, Math.max(lo, v));
-  const formA = clamp(streakA, -FORM_CAP, FORM_CAP) * FORM_POINTS;
-  const formB = clamp(streakB, -FORM_CAP, FORM_CAP) * FORM_POINTS;
-  const pElo = expectedScore(ra + formA, rb + formB);
-
   const between = enriched.filter(
     (m) =>
       (m.player1 === a && m.player2 === b) ||
       (m.player1 === b && m.player2 === a),
   );
 
-  let weightedA = 0;
-  let weightedTotal = 0;
   let h2hWinsA = 0;
   let h2hWinsB = 0;
-  for (let i = 0; i < between.length; i++) {
-    const m = between[between.length - 1 - i]; // i = matches into the past
-    const w = Math.pow(H2H_DECAY, i);
-    weightedTotal += w;
-    if (m.winnerName === a) {
-      weightedA += w;
-      h2hWinsA++;
-    } else {
-      h2hWinsB++;
-    }
+  const aWonNewestFirst: boolean[] = [];
+  for (let i = between.length - 1; i >= 0; i--) {
+    const aWon = between[i].winnerName === a;
+    aWonNewestFirst.push(aWon);
+    if (aWon) h2hWinsA++;
+    else h2hWinsB++;
   }
 
-  const pA = (weightedA + PRIOR_STRENGTH * pElo) / (weightedTotal + PRIOR_STRENGTH);
+  const { pA, pRating, pElo } = winProbability(ra, rb, streakA, streakB, aWonNewestFirst);
 
   return {
     pA,
