@@ -56,6 +56,8 @@ export default function Records() {
   const [expandedKiller, setExpandedKiller] = useState<string | null>(null);
   const [expandedReign, setExpandedReign] = useState<string | null>(null);
   const [expandedTopFive, setExpandedTopFive] = useState<string | null>(null);
+  const [expandedWinRun, setExpandedWinRun] = useState<number | null>(null);
+  const [expandedLossRun, setExpandedLossRun] = useState<number | null>(null);
 
   const winList = uniqueWins ? bestPerPlayer(records.winStreaks) : records.winStreaks;
   const lossList = uniqueLosses ? bestPerPlayer(records.lossStreaks) : records.lossStreaks;
@@ -88,7 +90,10 @@ export default function Records() {
           <button
             className="btn ghost"
             style={{ padding: "3px 10px", fontSize: 11 }}
-            onClick={() => setUniqueWins((v) => !v)}
+            onClick={() => {
+              setUniqueWins((v) => !v);
+              setExpandedWinRun(null);
+            }}
           >
             {uniqueWins ? "Show every streak" : "Best per player"}
           </button>
@@ -110,16 +115,62 @@ export default function Records() {
               <table>
                 <tbody>
                   {winList.slice(0, TOP_N).map((s, i) => (
-                    <tr key={i}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={s.player} />
-                      </td>
-                      <td className="num">
-                        <span className="badge up">W{s.length}</span>
-                      </td>
-                      <td style={{ color: "var(--text-dim)" }}>{streakWhen(s)}</td>
-                    </tr>
+                    <Fragment key={i}>
+                      <tr>
+                        <td className="rank-cell">{i + 1}</td>
+                        <td>
+                          <PlayerLink name={s.player} />
+                        </td>
+                        <td className="num">
+                          <span className="badge up">W{s.length}</span>
+                        </td>
+                        <td style={{ color: "var(--text-dim)" }}>{streakWhen(s)}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn ghost"
+                            style={{ padding: "2px 10px", fontSize: 11 }}
+                            onClick={() => setExpandedWinRun(expandedWinRun === i ? null : i)}
+                          >
+                            {expandedWinRun === i ? "Hide" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedWinRun === i && (
+                        <tr>
+                          <td />
+                          <td colSpan={4}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 4,
+                                padding: "2px 0 10px",
+                                fontSize: 13,
+                                color: "var(--text-dim)",
+                              }}
+                            >
+                              {s.matches.map((m, j) => (
+                                <div key={m.id}>
+                                  <span className="rank-cell">{j + 1}.</span>{" "}
+                                  {formatDate(m.date)} — beat{" "}
+                                  <PlayerLink
+                                    name={m.player1 === s.player ? m.player2 : m.player1}
+                                  />
+                                  {m.score ? ` ${m.score}` : ""}
+                                  {m.tournament && (
+                                    <span
+                                      className="badge gold"
+                                      style={{ marginLeft: 8, fontSize: 11 }}
+                                    >
+                                      🏆 {m.tournament}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -136,7 +187,10 @@ export default function Records() {
           <button
             className="btn ghost"
             style={{ padding: "3px 10px", fontSize: 11 }}
-            onClick={() => setUniqueLosses((v) => !v)}
+            onClick={() => {
+              setUniqueLosses((v) => !v);
+              setExpandedLossRun(null);
+            }}
           >
             {uniqueLosses ? "Show every streak" : "Best per player"}
           </button>
@@ -158,16 +212,60 @@ export default function Records() {
               <table>
                 <tbody>
                   {lossList.slice(0, TOP_N).map((s, i) => (
-                    <tr key={i}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={s.player} />
-                      </td>
-                      <td className="num">
-                        <span className="badge down">L{s.length}</span>
-                      </td>
-                      <td style={{ color: "var(--text-dim)" }}>{streakWhen(s)}</td>
-                    </tr>
+                    <Fragment key={i}>
+                      <tr>
+                        <td className="rank-cell">{i + 1}</td>
+                        <td>
+                          <PlayerLink name={s.player} />
+                        </td>
+                        <td className="num">
+                          <span className="badge down">L{s.length}</span>
+                        </td>
+                        <td style={{ color: "var(--text-dim)" }}>{streakWhen(s)}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn ghost"
+                            style={{ padding: "2px 10px", fontSize: 11 }}
+                            onClick={() => setExpandedLossRun(expandedLossRun === i ? null : i)}
+                          >
+                            {expandedLossRun === i ? "Hide" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedLossRun === i && (
+                        <tr>
+                          <td />
+                          <td colSpan={4}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 4,
+                                padding: "2px 0 10px",
+                                fontSize: 13,
+                                color: "var(--text-dim)",
+                              }}
+                            >
+                              {s.matches.map((m, j) => (
+                                <div key={m.id}>
+                                  <span className="rank-cell">{j + 1}.</span>{" "}
+                                  {formatDate(m.date)} — lost to{" "}
+                                  <PlayerLink name={m.winnerName} />
+                                  {m.score ? ` ${m.score}` : ""}
+                                  {m.tournament && (
+                                    <span
+                                      className="badge gold"
+                                      style={{ marginLeft: 8, fontSize: 11 }}
+                                    >
+                                      🏆 {m.tournament}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

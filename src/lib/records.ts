@@ -16,6 +16,8 @@ export interface StreakRecord {
   start: string;
   /** Date the run was broken; null while still active */
   end: string | null;
+  /** The matches that made up the run, chronological */
+  matches: EnrichedMatch[];
 }
 
 /** One continuous stint holding a ranking position */
@@ -241,6 +243,8 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const streak = new Map<string, number>(); // >0 win run, <0 loss run
   const winStart = new Map<string, string>();
   const lossStart = new Map<string, string>();
+  const winRunMatches = new Map<string, EnrichedMatch[]>();
+  const lossRunMatches = new Map<string, EnrichedMatch[]>();
   const winRuns: StreakRecord[] = []; // every completed (or active) run
   const lossRuns: StreakRecord[] = [];
   const highest = new Map<string, RatingExtreme>();
@@ -302,11 +306,17 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
         length: -prevW,
         start: lossStart.get(winner) ?? m.date,
         end: m.date,
+        matches: lossRunMatches.get(winner) ?? [],
       });
+      lossRunMatches.delete(winner);
     }
     const newW = prevW > 0 ? prevW + 1 : 1;
     streak.set(winner, newW);
-    if (newW === 1) winStart.set(winner, m.date);
+    if (newW === 1) {
+      winStart.set(winner, m.date);
+      winRunMatches.set(winner, []);
+    }
+    winRunMatches.get(winner)?.push(m);
 
     // Losing ends any winning run the loser was on
     if (prevL > 0) {
@@ -315,11 +325,17 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
         length: prevL,
         start: winStart.get(loser) ?? m.date,
         end: m.date,
+        matches: winRunMatches.get(loser) ?? [],
       });
+      winRunMatches.delete(loser);
     }
     const newL = prevL < 0 ? prevL - 1 : -1;
     streak.set(loser, newL);
-    if (newL === -1) lossStart.set(loser, m.date);
+    if (newL === -1) {
+      lossStart.set(loser, m.date);
+      lossRunMatches.set(loser, []);
+    }
+    lossRunMatches.get(loser)?.push(m);
 
     // Rated-moment rating extremes
     played.set(m.player1, played1 + 1);
@@ -339,9 +355,21 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   // Runs still alive at the end of the log count too
   for (const [name, s] of streak) {
     if (s > 0) {
-      winRuns.push({ player: name, length: s, start: winStart.get(name) ?? "", end: null });
+      winRuns.push({
+        player: name,
+        length: s,
+        start: winStart.get(name) ?? "",
+        end: null,
+        matches: winRunMatches.get(name) ?? [],
+      });
     } else if (s < 0) {
-      lossRuns.push({ player: name, length: -s, start: lossStart.get(name) ?? "", end: null });
+      lossRuns.push({
+        player: name,
+        length: -s,
+        start: lossStart.get(name) ?? "",
+        end: null,
+        matches: lossRunMatches.get(name) ?? [],
+      });
     }
   }
 
