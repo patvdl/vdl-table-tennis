@@ -11,6 +11,7 @@ import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import PlayerActions from "../components/PlayerActions";
 import PlayerName from "../components/PlayerName";
+import Crown from "../components/Crown";
 
 function todayISO(): string {
   const d = new Date();
@@ -315,6 +316,7 @@ export default function Leaderboard() {
                     >
                       <PlayerName name={p.name} />
                     </Link>
+                    {rank === 1 && <Crown title="Ranked #1" />}
                     <Trophy player={p.name} asOf={timeTravelling ? asOf : undefined} />
                   </td>
                   <td className="num rating">{round0(p.rating)}</td>

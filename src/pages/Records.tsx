@@ -6,6 +6,7 @@ import type { RankSpan, StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
 import { formatDate, pct, round0 } from "../lib/format";
 import Avatar from "../components/Avatar";
+import Crown from "../components/Crown";
 import PlayerName from "../components/PlayerName";
 
 const TOP_N = 5;
@@ -125,15 +126,14 @@ export default function Records() {
                   <span
                     style={{
                       position: "absolute",
-                      top: -16,
-                      left: -8,
-                      fontSize: 30,
+                      top: -15,
+                      left: -7,
                       transform: "rotate(-24deg)",
-                      textShadow: "0 2px 6px rgba(0,0,0,0.6)",
+                      lineHeight: 0,
                     }}
                     aria-hidden
                   >
-                    👑
+                    <Crown size={30} />
                   </span>
                 </div>
                 <div>
@@ -142,7 +142,7 @@ export default function Records() {
                     {season.inProgress && " · so far"}
                   </div>
                   <div className="record-value" style={{ fontSize: 30 }}>
-                    <PlayerLink name={poty.player} /> <span aria-hidden>👑</span>
+                    <PlayerLink name={poty.player} /> <Crown size="0.8em" />
                   </div>
                   <div className="record-context">season score {poty.score} / 100</div>
                 </div>
@@ -223,8 +223,8 @@ export default function Records() {
                       <tr key={s.player}>
                         <td className="rank-cell">{i + 1}</td>
                         <td>
-                          <PlayerLink name={s.player} />{" "}
-                          {s.player === poty.player && <span aria-hidden>👑</span>}
+                          <PlayerLink name={s.player} />
+                          {s.player === poty.player && <Crown />}
                         </td>
                         <td className="num" style={{ fontFamily: "var(--mono)" }}>
                           {s.wins}–{s.losses}
