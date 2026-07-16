@@ -247,16 +247,25 @@ export default function HeadToHeadPage() {
                     <th>Date</th>
                     <th>Winner</th>
                     <th>Score</th>
+                    <th className="num" title={`${h2h.a}–${h2h.b} after this match`}>
+                      H2H
+                    </th>
                     <th className="num">ELO exchange</th>
                     <th className="num">{h2h.a} rating</th>
                     <th className="num">{h2h.b} rating</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...h2h.matches].reverse().map((m) => {
+                  {[...h2h.matches].reverse().map((m, i) => {
                     const aIsP1 = m.player1 === h2h.a;
                     const aAfter = aIsP1 ? m.rating1After : m.rating2After;
                     const bAfter = aIsP1 ? m.rating2After : m.rating1After;
+                    // Running record (a–b) once this match was played
+                    const upTo = h2h.matches.length - i;
+                    const aSoFar = h2h.matches
+                      .slice(0, upTo)
+                      .filter((x) => x.winnerName === h2h.a).length;
+                    const bSoFar = upTo - aSoFar;
                     return (
                       <tr key={m.id}>
                         <td>{formatDate(m.date)}</td>
@@ -272,6 +281,17 @@ export default function HeadToHeadPage() {
                               🏆 {m.tournament}
                             </span>
                           )}
+                        </td>
+                        <td
+                          className={`num ${aSoFar > bSoFar ? "win-a" : bSoFar > aSoFar ? "win-b" : ""}`}
+                          style={{
+                            fontFamily: "var(--mono)",
+                            fontWeight: 700,
+                            color: aSoFar === bSoFar ? "var(--text-dim)" : undefined,
+                          }}
+                          title={`${h2h.a} ${aSoFar} – ${bSoFar} ${h2h.b}`}
+                        >
+                          {aSoFar}–{bSoFar}
                         </td>
                         <td className="num delta-up">{signed(Math.abs(m.delta))}</td>
                         <td className="num rating">{round0(aAfter)}</td>
