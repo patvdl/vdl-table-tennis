@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { computeRecords } from "../lib/records";
-import type { StreakRecord } from "../lib/records";
+import type { RankSpan, StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
 import { formatDate, round0 } from "../lib/format";
 import Avatar from "../components/Avatar";
@@ -54,6 +54,8 @@ export default function Records() {
   const [uniqueWins, setUniqueWins] = useState(false);
   const [uniqueLosses, setUniqueLosses] = useState(false);
   const [expandedKiller, setExpandedKiller] = useState<string | null>(null);
+  const [expandedReign, setExpandedReign] = useState<string | null>(null);
+  const [expandedTopFive, setExpandedTopFive] = useState<string | null>(null);
 
   const winList = uniqueWins ? bestPerPlayer(records.winStreaks) : records.winStreaks;
   const lossList = uniqueLosses ? bestPerPlayer(records.lossStreaks) : records.lossStreaks;
@@ -72,6 +74,11 @@ export default function Records() {
 
   const streakWhen = (s: { start: string; end: string | null }) =>
     `${formatDate(s.start)} → ${s.end ? formatDate(s.end) : "still active"}`;
+
+  const spanLine = (s: RankSpan) =>
+    `${formatDate(s.start)} → ${s.end ? formatDate(s.end) : "present"} · ${s.days} ${
+      s.days === 1 ? "day" : "days"
+    }`;
 
   return (
     <div className="records-grid">
@@ -191,19 +198,52 @@ export default function Records() {
               <table>
                 <tbody>
                   {records.reigns.slice(0, TOP_N).map((r, i) => (
-                    <tr key={r.player}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={r.player} />{" "}
-                        {r.current && <span className="badge gold">current #1</span>}
-                      </td>
-                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                        {r.days} {r.days === 1 ? "day" : "days"}
-                      </td>
-                      <td style={{ color: "var(--text-dim)" }}>
-                        {r.reigns} {r.reigns === 1 ? "reign" : "reigns"}
-                      </td>
-                    </tr>
+                    <Fragment key={r.player}>
+                      <tr>
+                        <td className="rank-cell">{i + 1}</td>
+                        <td>
+                          <PlayerLink name={r.player} />{" "}
+                          {r.current && <span className="badge gold">current #1</span>}
+                        </td>
+                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                          {r.days} {r.days === 1 ? "day" : "days"}
+                        </td>
+                        <td style={{ color: "var(--text-dim)" }}>
+                          {r.reigns} {r.reigns === 1 ? "reign" : "reigns"}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn ghost"
+                            style={{ padding: "2px 10px", fontSize: 11 }}
+                            onClick={() =>
+                              setExpandedReign(expandedReign === r.player ? null : r.player)
+                            }
+                          >
+                            {expandedReign === r.player ? "Hide" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedReign === r.player && (
+                        <tr>
+                          <td />
+                          <td colSpan={4}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 4,
+                                padding: "2px 0 10px",
+                                fontSize: 13,
+                                color: "var(--text-dim)",
+                              }}
+                            >
+                              {r.spans.map((s, j) => (
+                                <div key={j}>{spanLine(s)}</div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -228,16 +268,49 @@ export default function Records() {
               <table>
                 <tbody>
                   {records.topFive.slice(0, TOP_N).map((t, i) => (
-                    <tr key={t.player}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={t.player} />{" "}
-                        {t.current && <span className="badge neutral">current top 5</span>}
-                      </td>
-                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                        {t.days} {t.days === 1 ? "day" : "days"}
-                      </td>
-                    </tr>
+                    <Fragment key={t.player}>
+                      <tr>
+                        <td className="rank-cell">{i + 1}</td>
+                        <td>
+                          <PlayerLink name={t.player} />{" "}
+                          {t.current && <span className="badge neutral">current top 5</span>}
+                        </td>
+                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                          {t.days} {t.days === 1 ? "day" : "days"}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn ghost"
+                            style={{ padding: "2px 10px", fontSize: 11 }}
+                            onClick={() =>
+                              setExpandedTopFive(expandedTopFive === t.player ? null : t.player)
+                            }
+                          >
+                            {expandedTopFive === t.player ? "Hide" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedTopFive === t.player && (
+                        <tr>
+                          <td />
+                          <td colSpan={3}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 4,
+                                padding: "2px 0 10px",
+                                fontSize: 13,
+                                color: "var(--text-dim)",
+                              }}
+                            >
+                              {t.spans.map((s, j) => (
+                                <div key={j}>{spanLine(s)}</div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

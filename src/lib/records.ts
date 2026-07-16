@@ -18,11 +18,21 @@ export interface StreakRecord {
   end: string | null;
 }
 
+/** One continuous stint holding a ranking position */
+export interface RankSpan {
+  start: string;
+  /** Date the stint ended; null while still ongoing */
+  end: string | null;
+  days: number;
+}
+
 export interface TopFiveRecord {
   player: string;
   /** Total full days spent ranked in the top 5 */
   days: number;
   current: boolean;
+  /** Individual stints, chronological */
+  spans: RankSpan[];
 }
 
 export interface GiantKillerRecord {
@@ -61,6 +71,8 @@ export interface ReignRecord {
   current: boolean;
   /** Start date of the current reign (only for the current holder) */
   since: string | null;
+  /** Individual reigns, chronological */
+  spans: RankSpan[];
 }
 
 export interface RecordBook {
@@ -112,9 +124,8 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
     byDate.set(m.date, list);
   }
 
-  const daysAtTop = new Map<string, number>();
-  const reignCounts = new Map<string, number>();
-  const daysTop5 = new Map<string, number>();
+  const reignSpans = new Map<string, RankSpan[]>();
+  const top5Spans = new Map<string, RankSpan[]>();
   type KillTally = {
     wins: number;
     latest: string;
@@ -124,7 +135,19 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
   const kills = new Map<string, KillTally>();
   let holder: string | null = null;
   let holderSince: string | null = null;
+  let prevTop5 = new Set<string>();
   let currentTop5: string[] = [];
+
+  const openSpan = (map: Map<string, RankSpan[]>, name: string, date: string) => {
+    const list = map.get(name) ?? [];
+    list.push({ start: date, end: null, days: 0 });
+    map.set(name, list);
+  };
+  const closeSpan = (map: Map<string, RankSpan[]>, name: string, date: string) => {
+    const list = map.get(name);
+    const last = list?.[list.length - 1];
+    if (last && last.end === null) last.end = date;
+  };
 
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
@@ -154,35 +177,47 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
     if (!top) continue; // nobody rated yet
 
     if (top !== holder) {
+      if (holder) closeSpan(reignSpans, holder, date);
+      openSpan(reignSpans, top, date);
       holder = top;
       holderSince = date;
-      reignCounts.set(top, (reignCounts.get(top) ?? 0) + 1);
     }
-    const until = i + 1 < dates.length ? dates[i + 1] : todayIso();
-    const span = diffDays(date, until);
-    daysAtTop.set(top, (daysAtTop.get(top) ?? 0) + span);
 
     currentTop5 = board.slice(0, 5).map((p) => p.name);
     for (const name of currentTop5) {
-      daysTop5.set(name, (daysTop5.get(name) ?? 0) + span);
+      if (!prevTop5.has(name)) openSpan(top5Spans, name, date);
     }
+    for (const name of prevTop5) {
+      if (!currentTop5.includes(name)) closeSpan(top5Spans, name, date);
+    }
+    prevTop5 = new Set(currentTop5);
   }
 
-  const reigns = [...reignCounts.keys()]
-    .map((name) => ({
+  // Stamp each stint's length; day totals derive from the stints so the
+  // details always add up to the headline number.
+  const today = todayIso();
+  const finalize = (spans: RankSpan[]) => {
+    for (const s of spans) s.days = diffDays(s.start, s.end ?? today);
+    return spans.reduce((sum, s) => sum + s.days, 0);
+  };
+
+  const reigns = [...reignSpans.entries()]
+    .map(([name, spans]) => ({
       player: name,
-      days: daysAtTop.get(name) ?? 0,
-      reigns: reignCounts.get(name) ?? 0,
+      days: finalize(spans),
+      reigns: spans.length,
       current: name === holder,
       since: name === holder ? holderSince : null,
+      spans,
     }))
     .sort((a, b) => b.days - a.days || b.reigns - a.reigns);
 
-  const topFive = [...daysTop5.keys()]
-    .map((name) => ({
+  const topFive = [...top5Spans.entries()]
+    .map(([name, spans]) => ({
       player: name,
-      days: daysTop5.get(name) ?? 0,
+      days: finalize(spans),
       current: currentTop5.includes(name),
+      spans,
     }))
     .sort((a, b) => b.days - a.days);
 
