@@ -1,5 +1,5 @@
 import type { EnrichedMatch } from "../types";
-import { RATED_MIN, leaderboard, replay, winProbability } from "./elo";
+import { RATED_MIN, START_RATING, leaderboard, replay, winProbability } from "./elo";
 
 /**
  * All-time record book, derived from a single chronological scan of the
@@ -77,6 +77,44 @@ export interface ReignRecord {
   spans: RankSpan[];
 }
 
+/** Matches a player must have in a calendar year to qualify for the award */
+export const SEASON_MIN = 10;
+
+export interface SeasonStats {
+  player: string;
+  played: number;
+  wins: number;
+  losses: number;
+  winPct: number;
+  /** Wins over opponents ranked in the top 5 going into that day */
+  topFiveWins: number;
+  /** Wins over the reigning #1 */
+  no1Wins: number;
+  /** Highest-ranked opponent beaten during the year */
+  bestWin: { opponent: string; opponentRank: number; date: string } | null;
+  daysAtNo1: number;
+  daysTop5: number;
+  /** Best rank held at any point during the year */
+  bestRank: number | null;
+  /** Rank/rating as the year closed (or right now for the current year) */
+  endRank: number | null;
+  endRating: number | null;
+  /** Highest rating held while ranked during the year */
+  peakRating: number | null;
+  eligible: boolean;
+  /** Composite season score, 0–100 */
+  score: number;
+}
+
+export interface SeasonAward {
+  year: number;
+  /** True for the current calendar year — the race is still open */
+  inProgress: boolean;
+  winner: SeasonStats | null;
+  /** Everyone who played that year, best season first */
+  standings: SeasonStats[];
+}
+
 export interface RecordBook {
   winStreaks: StreakRecord[]; // every individual run, longest first
   lossStreaks: StreakRecord[]; // every individual run, longest first
@@ -86,6 +124,7 @@ export interface RecordBook {
   reigns: ReignRecord[]; // most days at #1 first
   topFive: TopFiveRecord[]; // most days ranked in the top 5 first
   giantKillers: GiantKillerRecord[]; // most wins over reigning #1s first
+  seasons: SeasonAward[]; // player of the year, oldest year first
 }
 
 function pairKey(a: string, b: string): string {
@@ -103,22 +142,43 @@ function todayIso(): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+interface DailyBoard {
+  date: string;
+  /** Ranked (rated) players as the day closed, best first */
+  board: { name: string; rating: number }[];
+}
+
 /**
- * Records that depend on the standings over time: for every date on which
- * matches were played, rebuild the leaderboard as it stood at the end of
- * that day (same replay the historical leaderboard view uses — the match
- * log's seq order is not strictly date-ordered, so we can't just walk it
- * linearly). From that one pass we get:
+ * The leaderboard as it stood at the end of every match day (same replay
+ * the historical leaderboard view uses — the match log's seq order is not
+ * strictly date-ordered, so we can't just walk it linearly).
+ */
+function buildDailyBoards(enriched: EnrichedMatch[]): DailyBoard[] {
+  const dates = [...new Set(enriched.map((m) => m.date))].sort();
+  return dates.map((date) => ({
+    date,
+    board: leaderboard(replay(enriched.filter((m) => m.date <= date)).stats).map((p) => ({
+      name: p.name,
+      rating: p.rating,
+    })),
+  }));
+}
+
+/**
+ * Records that depend on the standings over time, derived from the daily
+ * boards:
  * - days spent at #1 (the day's #1 holds it until the standings next change)
  * - days spent ranked in the top 5
  * - wins over the reigning #1 (the #1 going into that day's play)
  */
-function computeStandingsRecords(enriched: EnrichedMatch[]): {
+function computeStandingsRecords(
+  enriched: EnrichedMatch[],
+  boards: DailyBoard[],
+): {
   reigns: ReignRecord[];
   topFive: TopFiveRecord[];
   giantKillers: GiantKillerRecord[];
 } {
-  const dates = [...new Set(enriched.map((m) => m.date))].sort();
   const byDate = new Map<string, EnrichedMatch[]>();
   for (const m of enriched) {
     const list = byDate.get(m.date) ?? [];
@@ -151,8 +211,8 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
     if (last && last.end === null) last.end = date;
   };
 
-  for (let i = 0; i < dates.length; i++) {
-    const date = dates[i];
+  for (let i = 0; i < boards.length; i++) {
+    const { date, board } = boards[i];
 
     // Wins over the #1: `holder` is still the reigning #1 going into
     // this day's play (standings update after the day's matches).
@@ -173,8 +233,6 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
       }
     }
 
-    const asOf = enriched.filter((m) => m.date <= date);
-    const board = leaderboard(replay(asOf).stats);
     const top = board[0]?.name;
     if (!top) continue; // nobody rated yet
 
@@ -236,6 +294,172 @@ function computeStandingsRecords(enriched: EnrichedMatch[]): {
     .sort((a, b) => b.wins - a.wins || a.latest.localeCompare(b.latest));
 
   return { reigns, topFive, giantKillers };
+}
+
+/**
+ * Player of the Year. Every player's season is condensed into a 0–100
+ * score blending five signals, each normalised against the year's best:
+ * - 30% win rate
+ * - 20% number of wins
+ * - 20% quality of wins (top-5 scalps, with wins over the #1 double-weighted)
+ * - 20% dominance (days at #1, plus days in the top 5 at half weight)
+ * - 10% peak rating during the year
+ * The award needs SEASON_MIN matches in the year; if nobody qualifies
+ * (very early in a season) the best score so far wins provisionally.
+ */
+function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): SeasonAward[] {
+  if (enriched.length === 0) return [];
+  const today = todayIso();
+  const currentYear = Number(today.slice(0, 4));
+  const years = [...new Set(enriched.map((m) => Number(m.date.slice(0, 4))))].sort(
+    (a, b) => a - b,
+  );
+
+  const byYear = new Map<number, Map<string, SeasonStats>>();
+  const ensure = (year: number, name: string): SeasonStats => {
+    let ymap = byYear.get(year);
+    if (!ymap) {
+      ymap = new Map();
+      byYear.set(year, ymap);
+    }
+    let s = ymap.get(name);
+    if (!s) {
+      s = {
+        player: name,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        winPct: 0,
+        topFiveWins: 0,
+        no1Wins: 0,
+        bestWin: null,
+        daysAtNo1: 0,
+        daysTop5: 0,
+        bestRank: null,
+        endRank: null,
+        endRating: null,
+        peakRating: null,
+        eligible: false,
+        score: 0,
+      };
+      ymap.set(name, s);
+    }
+    return s;
+  };
+
+  // Standings going into each match day = the previous day's board
+  const boardBefore = new Map<string, DailyBoard["board"]>();
+  for (let i = 0; i < boards.length; i++) {
+    boardBefore.set(boards[i].date, i > 0 ? boards[i - 1].board : []);
+  }
+
+  // Match tallies and quality wins
+  for (const m of enriched) {
+    const year = Number(m.date.slice(0, 4));
+    const w = ensure(year, m.winnerName);
+    const l = ensure(year, m.loserName);
+    w.played++;
+    w.wins++;
+    l.played++;
+    l.losses++;
+
+    const before = boardBefore.get(m.date) ?? [];
+    const rank = before.findIndex((p) => p.name === m.loserName) + 1;
+    if (rank > 0) {
+      if (rank === 1) w.no1Wins++;
+      if (rank <= 5) w.topFiveWins++;
+      if (!w.bestWin || rank < w.bestWin.opponentRank) {
+        w.bestWin = { opponent: m.loserName, opponentRank: rank, date: m.date };
+      }
+    }
+  }
+
+  // Time-based signals: each board holds from its date until the next
+  // match day (or today); clip every segment to the years it overlaps.
+  for (let i = 0; i < boards.length; i++) {
+    const { date, board } = boards[i];
+    if (board.length === 0) continue;
+    const until = i + 1 < boards.length ? boards[i + 1].date : today;
+
+    const firstYear = Number(date.slice(0, 4));
+    const lastYear = Number(until.slice(0, 4));
+    for (let year = firstYear; year <= lastYear; year++) {
+      const ymap = byYear.get(year);
+      if (!ymap) continue; // segment reaches into a year with no matches
+      const yStart = `${year}-01-01`;
+      const yEnd = `${year + 1}-01-01`;
+      if (date >= yEnd) continue;
+
+      const from = date > yStart ? date : yStart;
+      const to = until < yEnd ? until : yEnd;
+      const overlap = diffDays(from, to);
+
+      if (overlap > 0) {
+        const topStats = ymap.get(board[0].name);
+        if (topStats) topStats.daysAtNo1 += overlap;
+        for (const p of board.slice(0, 5)) {
+          const s = ymap.get(p.name);
+          if (s) s.daysTop5 += overlap;
+        }
+      }
+
+      // Ranks/ratings held while this board was in effect during `year`.
+      // Later boards overwrite endRank, so the last one standing is the
+      // year-end (or current) position.
+      board.forEach((p, idx) => {
+        const s = ymap.get(p.name);
+        if (!s) return;
+        const rank = idx + 1;
+        if (s.bestRank === null || rank < s.bestRank) s.bestRank = rank;
+        if (s.peakRating === null || p.rating > s.peakRating) s.peakRating = p.rating;
+        s.endRank = rank;
+        s.endRating = p.rating;
+      });
+    }
+  }
+
+  // Score each season
+  return years.map((year) => {
+    const list = [...(byYear.get(year)?.values() ?? [])];
+    for (const s of list) {
+      s.winPct = s.played > 0 ? s.wins / s.played : 0;
+      s.eligible = s.played >= SEASON_MIN;
+    }
+    const pool = list.some((s) => s.eligible) ? list.filter((s) => s.eligible) : list;
+
+    const quality = (s: SeasonStats) => s.topFiveWins + s.no1Wins; // #1 wins count twice
+    const dominance = (s: SeasonStats) => s.daysAtNo1 + 0.5 * s.daysTop5;
+    const ratingX = (s: SeasonStats) => Math.max(0, (s.peakRating ?? START_RATING) - START_RATING);
+    const norm = (f: (s: SeasonStats) => number) => {
+      const max = Math.max(...pool.map(f), 0);
+      return (s: SeasonStats) => (max > 0 ? Math.min(f(s) / max, 1) : 0);
+    };
+    const nPct = norm((s) => s.winPct);
+    const nWins = norm((s) => s.wins);
+    const nQuality = norm(quality);
+    const nDominance = norm(dominance);
+    const nRating = norm(ratingX);
+
+    for (const s of list) {
+      s.score =
+        Math.round(
+          100 *
+            (0.3 * nPct(s) +
+              0.2 * nWins(s) +
+              0.2 * nQuality(s) +
+              0.2 * nDominance(s) +
+              0.1 * nRating(s)) *
+            10,
+        ) / 10;
+    }
+
+    const standings = list.sort(
+      (a, b) => b.score - a.score || b.wins - a.wins || b.winPct - a.winPct,
+    );
+    const winner = standings.find((s) => s.eligible) ?? standings[0] ?? null;
+
+    return { year, inProgress: year === currentYear, winner, standings };
+  });
 }
 
 export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
@@ -376,7 +600,8 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const byLengthThenStart = (a: StreakRecord, b: StreakRecord) =>
     b.length - a.length || a.start.localeCompare(b.start);
 
-  const { reigns, topFive, giantKillers } = computeStandingsRecords(enriched);
+  const boards = buildDailyBoards(enriched);
+  const { reigns, topFive, giantKillers } = computeStandingsRecords(enriched, boards);
 
   return {
     winStreaks: winRuns.sort(byLengthThenStart),
@@ -387,5 +612,6 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
     reigns,
     topFive,
     giantKillers,
+    seasons: computeSeasons(enriched, boards),
   };
 }

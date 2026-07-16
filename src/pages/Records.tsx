@@ -1,10 +1,10 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { computeRecords } from "../lib/records";
+import { computeRecords, SEASON_MIN } from "../lib/records";
 import type { RankSpan, StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
-import { formatDate, round0 } from "../lib/format";
+import { formatDate, pct, round0 } from "../lib/format";
 import Avatar from "../components/Avatar";
 
 const TOP_N = 5;
@@ -58,6 +58,12 @@ export default function Records() {
   const [expandedTopFive, setExpandedTopFive] = useState<string | null>(null);
   const [expandedWinRun, setExpandedWinRun] = useState<number | null>(null);
   const [expandedLossRun, setExpandedLossRun] = useState<number | null>(null);
+  const [selYear, setSelYear] = useState<number | null>(null);
+
+  const seasons = records.seasons;
+  const season =
+    seasons.find((s) => s.year === selYear) ?? seasons[seasons.length - 1] ?? null;
+  const poty = season?.winner ?? null;
 
   const winList = uniqueWins ? bestPerPlayer(records.winStreaks) : records.winStreaks;
   const lossList = uniqueLosses ? bestPerPlayer(records.lossStreaks) : records.lossStreaks;
@@ -84,6 +90,148 @@ export default function Records() {
 
   return (
     <div className="records-grid">
+      {season && (
+        <div className="card records-span">
+          <div className="card-head">
+            <h2>Player of the Year</h2>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {seasons.map((s) => (
+                <button
+                  key={s.year}
+                  className={`btn ${season.year === s.year ? "" : "ghost"}`}
+                  style={{ padding: "4px 14px", fontSize: 12 }}
+                  onClick={() => setSelYear(s.year)}
+                >
+                  {s.year}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="sub">
+            Judged on the whole season: win rate, number of wins, quality of wins
+            (beating top-5 and #1 ranked players), time spent at #1 and in the top 5,
+            and peak rating. Needs {SEASON_MIN}+ matches in the year to qualify.
+            {season.inProgress &&
+              " This season is still in progress — the race can change with every match."}
+          </p>
+
+          {poty && (
+            <>
+              <div className="record-hero">
+                <Avatar player={poty.player} size={96} />
+                <div>
+                  <div className="record-context">
+                    🏆 Player of the Year {season.year}
+                    {season.inProgress && " · so far"}
+                  </div>
+                  <div className="record-value" style={{ fontSize: 30 }}>
+                    <PlayerLink name={poty.player} />
+                  </div>
+                  <div className="record-context">season score {poty.score} / 100</div>
+                </div>
+              </div>
+
+              <div className="stat-grid" style={{ marginBottom: 16 }}>
+                <div className="stat-tile">
+                  <div className="label">Record</div>
+                  <div className="value">
+                    <span style={{ color: "var(--green)" }}>{poty.wins}</span>–
+                    <span style={{ color: "var(--red)" }}>{poty.losses}</span>
+                  </div>
+                  <div className="hint">{pct(poty.winPct)} win rate</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Days at #1</div>
+                  <div className="value">{poty.daysAtNo1}</div>
+                  <div className="hint">during {season.year}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Days in top 5</div>
+                  <div className="value">{poty.daysTop5}</div>
+                  <div className="hint">during {season.year}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Top-5 wins</div>
+                  <div className="value">{poty.topFiveWins}</div>
+                  <div className="hint">{poty.no1Wins} over the #1</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Best win</div>
+                  {poty.bestWin ? (
+                    <>
+                      <div className="value">#{poty.bestWin.opponentRank}</div>
+                      <div className="hint">
+                        beat {poty.bestWin.opponent} · {formatDate(poty.bestWin.date)}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="value">—</div>
+                      <div className="hint">no ranked wins</div>
+                    </>
+                  )}
+                </div>
+                <div className="stat-tile">
+                  <div className="label">Peak rating</div>
+                  <div className="value">
+                    {poty.peakRating !== null ? round0(poty.peakRating) : "—"}
+                  </div>
+                  <div className="hint">highest during {season.year}</div>
+                </div>
+                <div className="stat-tile">
+                  <div className="label">{season.inProgress ? "Current rank" : "Year-end rank"}</div>
+                  <div className="value">{poty.endRank !== null ? `#${poty.endRank}` : "—"}</div>
+                  <div className="hint">
+                    {poty.endRating !== null ? `rating ${round0(poty.endRating)}` : "unranked"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th />
+                      <th>Player</th>
+                      <th className="num">Record</th>
+                      <th className="num">Win %</th>
+                      <th className="num">Top-5 wins</th>
+                      <th className="num">Days at #1</th>
+                      <th className="num">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {season.standings.slice(0, 10).map((s, i) => (
+                      <tr key={s.player} style={s.eligible ? undefined : { opacity: 0.55 }}>
+                        <td className="rank-cell">{i + 1}</td>
+                        <td>
+                          <PlayerLink name={s.player} />{" "}
+                          {s.player === poty.player && <span className="badge gold">🏆</span>}
+                          {!s.eligible && (
+                            <span className="badge neutral" style={{ marginLeft: 6 }}>
+                              {s.played} {s.played === 1 ? "match" : "matches"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                          {s.wins}–{s.losses}
+                        </td>
+                        <td className="num">{pct(s.winPct)}</td>
+                        <td className="num">{s.topFiveWins}</td>
+                        <td className="num">{s.daysAtNo1}</td>
+                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                          {s.score}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="card">
         <div className="card-head">
           <h2>Longest win streak</h2>
