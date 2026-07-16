@@ -172,6 +172,83 @@ export default function Records() {
       </div>
 
       <div className="card">
+        <h2>Most days at #1</h2>
+        <p className="sub">Total days spent holding the top spot on the leaderboard.</p>
+        {topReign ? (
+          <>
+            <Hero
+              player={topReign.player}
+              value={`${topReign.days} days`}
+              context={
+                topReign.current
+                  ? `current #1 since ${formatDate(topReign.since)} · ${topReign.reigns} ${
+                      topReign.reigns === 1 ? "reign" : "reigns"
+                    }`
+                  : `${topReign.reigns} ${topReign.reigns === 1 ? "reign" : "reigns"}`
+              }
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {records.reigns.slice(0, TOP_N).map((r, i) => (
+                    <tr key={r.player}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={r.player} />{" "}
+                        {r.current && <span className="badge gold">current #1</span>}
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {r.days} {r.days === 1 ? "day" : "days"}
+                      </td>
+                      <td style={{ color: "var(--text-dim)" }}>
+                        {r.reigns} {r.reigns === 1 ? "reign" : "reigns"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="sub">Nobody has been ranked yet.</p>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Most days in the top 5</h2>
+        <p className="sub">Total days spent ranked among the leaderboard's top 5 players.</p>
+        {topFive ? (
+          <>
+            <Hero
+              player={topFive.player}
+              value={`${topFive.days} days`}
+              context={topFive.current ? "currently in the top 5" : "not currently in the top 5"}
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {records.topFive.slice(0, TOP_N).map((t, i) => (
+                    <tr key={t.player}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={t.player} />{" "}
+                        {t.current && <span className="badge neutral">current top 5</span>}
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {t.days} {t.days === 1 ? "day" : "days"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <p className="sub">Nobody has been ranked yet.</p>
+        )}
+      </div>
+
+      <div className="card">
         <h2>Biggest upset</h2>
         <p className="sub">
           The most improbable win ever recorded — judged by what the win predictor
@@ -334,83 +411,6 @@ export default function Records() {
           </>
         ) : (
           <p className="sub">Nobody has beaten a reigning #1 yet.</p>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Most days at #1</h2>
-        <p className="sub">Total days spent holding the top spot on the leaderboard.</p>
-        {topReign ? (
-          <>
-            <Hero
-              player={topReign.player}
-              value={`${topReign.days} days`}
-              context={
-                topReign.current
-                  ? `current #1 since ${formatDate(topReign.since)} · ${topReign.reigns} ${
-                      topReign.reigns === 1 ? "reign" : "reigns"
-                    }`
-                  : `${topReign.reigns} ${topReign.reigns === 1 ? "reign" : "reigns"}`
-              }
-            />
-            <div className="table-wrap">
-              <table>
-                <tbody>
-                  {records.reigns.slice(0, TOP_N).map((r, i) => (
-                    <tr key={r.player}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={r.player} />{" "}
-                        {r.current && <span className="badge gold">current #1</span>}
-                      </td>
-                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                        {r.days} {r.days === 1 ? "day" : "days"}
-                      </td>
-                      <td style={{ color: "var(--text-dim)" }}>
-                        {r.reigns} {r.reigns === 1 ? "reign" : "reigns"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
-          <p className="sub">Nobody has been ranked yet.</p>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Most days in the top 5</h2>
-        <p className="sub">Total days spent ranked among the leaderboard's top 5 players.</p>
-        {topFive ? (
-          <>
-            <Hero
-              player={topFive.player}
-              value={`${topFive.days} days`}
-              context={topFive.current ? "currently in the top 5" : "not currently in the top 5"}
-            />
-            <div className="table-wrap">
-              <table>
-                <tbody>
-                  {records.topFive.slice(0, TOP_N).map((t, i) => (
-                    <tr key={t.player}>
-                      <td className="rank-cell">{i + 1}</td>
-                      <td>
-                        <PlayerLink name={t.player} />{" "}
-                        {t.current && <span className="badge neutral">current top 5</span>}
-                      </td>
-                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                        {t.days} {t.days === 1 ? "day" : "days"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
-          <p className="sub">Nobody has been ranked yet.</p>
         )}
       </div>
 
