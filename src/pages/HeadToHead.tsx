@@ -5,6 +5,7 @@ import { headToHead, predictMatch } from "../lib/elo";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import H2HChart from "../components/H2HChart";
 import Avatar from "../components/Avatar";
+import PlayerName from "../components/PlayerName";
 
 export default function HeadToHeadPage() {
   const { playerNames, replayResult } = useMatches();
@@ -107,12 +108,16 @@ export default function HeadToHeadPage() {
           <div className="h2h-hero" style={{ paddingBottom: 8 }}>
             <div className="h2h-side">
               <Avatar player={a} size={264} />
-              <div className="name win-a" style={{ marginTop: 8 }}>{a}</div>
+              <div className="name win-a" style={{ marginTop: 8 }}>
+                <PlayerName name={a} />
+              </div>
             </div>
             <div className="h2h-vs">VS</div>
             <div className="h2h-side">
               <Avatar player={b} size={264} />
-              <div className="name win-b" style={{ marginTop: 8 }}>{b}</div>
+              <div className="name win-b" style={{ marginTop: 8 }}>
+                <PlayerName name={b} />
+              </div>
             </div>
           </div>
           <p className="sub" style={{ margin: 0, textAlign: "center" }}>
@@ -128,14 +133,18 @@ export default function HeadToHeadPage() {
             <div className="h2h-hero">
               <div className="h2h-side">
                 <Avatar player={h2h.a} size={264} />
-                <div className="name win-a" style={{ marginTop: 8 }}>{h2h.a}</div>
+                <div className="name win-a" style={{ marginTop: 8 }}>
+                  <PlayerName name={h2h.a} />
+                </div>
                 <div className="big win-a">{h2h.winsA}</div>
                 <div className="meta">{pct(h2h.winsA / h2h.total)} of meetings</div>
               </div>
               <div className="h2h-vs">VS</div>
               <div className="h2h-side">
                 <Avatar player={h2h.b} size={264} />
-                <div className="name win-b" style={{ marginTop: 8 }}>{h2h.b}</div>
+                <div className="name win-b" style={{ marginTop: 8 }}>
+                  <PlayerName name={h2h.b} />
+                </div>
                 <div className="big win-b">{h2h.winsB}</div>
                 <div className="meta">{pct(h2h.winsB / h2h.total)} of meetings</div>
               </div>
@@ -224,11 +233,11 @@ export default function HeadToHeadPage() {
             <p className="sub">
               {h2h.total} matches between{" "}
               <Link className="player-link" to={`/player/${encodeURIComponent(h2h.a)}`}>
-                {h2h.a}
+                <PlayerName name={h2h.a} />
               </Link>{" "}
               and{" "}
               <Link className="player-link" to={`/player/${encodeURIComponent(h2h.b)}`}>
-                {h2h.b}
+                <PlayerName name={h2h.b} />
               </Link>
             </p>
             <div className="table-wrap">
@@ -253,7 +262,7 @@ export default function HeadToHeadPage() {
                         <td>{formatDate(m.date)}</td>
                         <td>
                           <span className={m.winnerName === h2h.a ? "win-a" : "win-b"} style={{ fontWeight: 700 }}>
-                            {m.winnerName}
+                            <PlayerName name={m.winnerName} />
                           </span>
                         </td>
                         <td style={{ color: "var(--text-dim)" }}>

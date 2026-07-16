@@ -1,5 +1,5 @@
-/** A little black lop-eared bunny — Emily's profile mascot */
-export default function Bunny({ size = 26 }: { size?: number }) {
+/** A little black lop-eared bunny — Emily's mascot */
+export default function Bunny({ size = 26 }: { size?: number | string }) {
   return (
     <svg
       viewBox="0 0 64 64"
@@ -7,7 +7,7 @@ export default function Bunny({ size = 26 }: { size?: number }) {
       height={size}
       role="img"
       aria-label="black lop-eared bunny"
-      style={{ verticalAlign: "-4px", marginLeft: 2 }}
+      style={{ verticalAlign: "-0.18em", marginLeft: 3 }}
     >
       <g stroke="#8a8a94" strokeWidth="1.5" fill="#101013">
         {/* lop ears hanging down beside the head */}

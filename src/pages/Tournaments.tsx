@@ -5,6 +5,7 @@ import { useAuth } from "../store/auth";
 import { formatDate } from "../lib/format";
 import Bracket, { PlannedBracket } from "../components/Bracket";
 import Avatar from "../components/Avatar";
+import PlayerName from "../components/PlayerName";
 
 function today(): string {
   const d = new Date();
@@ -35,7 +36,7 @@ function Podium({ t }: { t: TournamentSummary }) {
                 className="player-link podium-name"
                 to={`/player/${encodeURIComponent(s.name!)}`}
               >
-                {s.name}
+                <PlayerName name={s.name!} />
               </Link>
             </div>
           </div>
@@ -459,7 +460,7 @@ export default function Tournaments() {
                         to={`/player/${encodeURIComponent(m.winnerName)}`}
                         style={{ color: "var(--green)" }}
                       >
-                        {m.winnerName}
+                        <PlayerName name={m.winnerName} />
                       </Link>
                     </td>
                     <td>
@@ -468,7 +469,7 @@ export default function Tournaments() {
                         to={`/player/${encodeURIComponent(m.loserName)}`}
                         style={{ color: "var(--red)" }}
                       >
-                        {m.loserName}
+                        <PlayerName name={m.loserName} />
                       </Link>
                     </td>
                     <td style={{ color: "var(--text-dim)" }}>{m.score ?? "—"}</td>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { EnrichedMatch } from "../types";
 import { roundLabel, type BracketNode, type PlannedNode } from "../lib/bracket";
+import PlayerName from "./PlayerName";
 
 /**
  * Visual single-elimination bracket, final on the right.
@@ -14,7 +15,7 @@ function NameOrTbd({ name }: { name: string | null }) {
   if (!name) return <span className="bk-tbd">TBD</span>;
   return (
     <Link className="player-link" to={`/player/${encodeURIComponent(name)}`}>
-      {name}
+      <PlayerName name={name} />
     </Link>
   );
 }

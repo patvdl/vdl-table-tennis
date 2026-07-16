@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMatches } from "../store/matches";
+import PlayerName from "./PlayerName";
 
 interface Props {
   value: string;
@@ -88,7 +89,7 @@ export default function PlayerCombo({ value, onChange, placeholder }: Props) {
               }}
               onMouseEnter={() => setHi(i)}
             >
-              {n}
+              <PlayerName name={n} />
             </button>
           ))}
         </div>

@@ -9,7 +9,7 @@ import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import Delta from "../components/Delta";
 import Avatar from "../components/Avatar";
-import Bunny from "../components/Bunny";
+import PlayerName from "../components/PlayerName";
 import PlayerActions from "../components/PlayerActions";
 
 const RECENT = 5;
@@ -60,8 +60,7 @@ export default function PlayerPage() {
           <Avatar player={player} size={240} />
           <div>
             <h2 style={{ marginBottom: 2 }}>
-              {player}
-              {player === "Emily" && <Bunny />}{" "}
+              <PlayerName name={player} />{" "}
               {isRegistered && <span className="badge neutral">Unrated</span>}
               {isRegistered && playerActions}
             </h2>
@@ -85,8 +84,7 @@ export default function PlayerPage() {
           <Avatar player={player} size={240} />
           <div>
             <h2 style={{ marginBottom: 2 }}>
-              {player}
-              {player === "Emily" && <Bunny />}{" "}
+              <PlayerName name={player} />{" "}
               {isRated ? (
                 <span className={`badge ${rank === 1 ? "gold" : "neutral"}`}>#{rank}</span>
               ) : (
@@ -243,7 +241,7 @@ export default function PlayerPage() {
                         className="player-link"
                         to={`/player/${encodeURIComponent(opponent)}`}
                       >
-                        {opponent}
+                        <PlayerName name={opponent} />
                       </Link>
                     </td>
                     <td style={{ color: "var(--text-dim)" }}>
@@ -300,7 +298,7 @@ export default function PlayerPage() {
                 <tr key={h.b}>
                   <td>
                     <Link className="player-link" to={`/player/${encodeURIComponent(h.b)}`}>
-                      {h.b}
+                      <PlayerName name={h.b} />
                     </Link>
                   </td>
                   <td className="num">{h.total}</td>

@@ -10,6 +10,7 @@ import Sparkline from "../components/Sparkline";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import PlayerActions from "../components/PlayerActions";
+import PlayerName from "../components/PlayerName";
 
 function todayISO(): string {
   const d = new Date();
@@ -312,7 +313,7 @@ export default function Leaderboard() {
                       className="player-link"
                       to={`/player/${encodeURIComponent(p.name)}`}
                     >
-                      {p.name}
+                      <PlayerName name={p.name} />
                     </Link>
                     <Trophy player={p.name} asOf={timeTravelling ? asOf : undefined} />
                   </td>
@@ -380,7 +381,7 @@ export default function Leaderboard() {
                       className="player-link"
                       to={`/player/${encodeURIComponent(p.name)}`}
                     >
-                      {p.name}
+                      <PlayerName name={p.name} />
                     </Link>
                     <Trophy player={p.name} asOf={timeTravelling ? asOf : undefined} />
                   </td>
@@ -414,7 +415,7 @@ export default function Leaderboard() {
                       className="player-link"
                       to={`/player/${encodeURIComponent(n)}`}
                     >
-                      {n}
+                      <PlayerName name={n} />
                     </Link>
                     <Trophy player={n} />
                   </td>
@@ -497,7 +498,9 @@ export default function Leaderboard() {
                 const busy = trashBusy === t.name;
                 return (
                   <tr key={t.name}>
-                    <td>{t.name}</td>
+                    <td>
+                      <PlayerName name={t.name} />
+                    </td>
                     <td className="num">{t.matchCount}</td>
                     <td style={{ color: "var(--text-dim)" }}>
                       {formatDate(t.deletedAt.slice(0, 10))}

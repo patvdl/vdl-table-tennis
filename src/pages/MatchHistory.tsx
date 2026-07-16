@@ -4,6 +4,7 @@ import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { formatDate, round0 } from "../lib/format";
 import Delta from "../components/Delta";
+import PlayerName from "../components/PlayerName";
 
 const PAGE = 50;
 
@@ -88,12 +89,12 @@ export default function MatchHistory() {
                   <td>{formatDate(m.date)}</td>
                   <td>
                     <Link className="player-link" to={`/player/${encodeURIComponent(m.winnerName)}`} style={{ color: "var(--green)" }}>
-                      {m.winnerName}
+                      <PlayerName name={m.winnerName} />
                     </Link>
                   </td>
                   <td>
                     <Link className="player-link" to={`/player/${encodeURIComponent(m.loserName)}`} style={{ color: "var(--red)" }}>
-                      {m.loserName}
+                      <PlayerName name={m.loserName} />
                     </Link>
                   </td>
                   <td style={{ color: "var(--text-dim)" }}>

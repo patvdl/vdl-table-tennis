@@ -6,13 +6,14 @@ import type { RankSpan, StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
 import { formatDate, pct, round0 } from "../lib/format";
 import Avatar from "../components/Avatar";
+import PlayerName from "../components/PlayerName";
 
 const TOP_N = 5;
 
 function PlayerLink({ name }: { name: string }) {
   return (
     <Link className="player-link" to={`/player/${encodeURIComponent(name)}`}>
-      {name}
+      <PlayerName name={name} />
     </Link>
   );
 }
@@ -177,7 +178,8 @@ export default function Records() {
                     <>
                       <div className="value">#{poty.bestWin.opponentRank}</div>
                       <div className="hint">
-                        beat {poty.bestWin.opponent} · {formatDate(poty.bestWin.date)}
+                        beat <PlayerName name={poty.bestWin.opponent} /> ·{" "}
+                        {formatDate(poty.bestWin.date)}
                       </div>
                     </>
                   ) : (
