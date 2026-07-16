@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMatches, type TournamentSummary } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { formatDate } from "../lib/format";
@@ -201,6 +201,13 @@ export default function Tournaments() {
   const isAdmin = role === "admin";
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+
+  // Deep link from trophy icons: /tournaments?id=<tournament id>
+  const urlId = searchParams.get("id");
+  useEffect(() => {
+    if (urlId) setSelectedId(urlId);
+  }, [urlId]);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState(`Christmas ${new Date().getFullYear()}`);
   const [newDate, setNewDate] = useState(today());

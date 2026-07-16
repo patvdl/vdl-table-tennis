@@ -18,6 +18,8 @@ export interface StreakRecord {
   end: string | null;
   /** The matches that made up the run, chronological */
   matches: EnrichedMatch[];
+  /** The match that broke the run; null while still active */
+  endedBy: EnrichedMatch | null;
 }
 
 /** One continuous stint holding a ranking position */
@@ -158,6 +160,30 @@ function buildDailyBoards(enriched: EnrichedMatch[]): DailyBoard[] {
       rating: p.rating,
     })),
   }));
+}
+
+// The match log array from the store is referentially stable between data
+// changes, so cache the expensive day-by-day replay per log instance. This
+// lets Crowns (rendered on every leaderboard row) share one computation.
+const boardsCache = new WeakMap<EnrichedMatch[], DailyBoard[]>();
+function dailyBoardsFor(enriched: EnrichedMatch[]): DailyBoard[] {
+  let boards = boardsCache.get(enriched);
+  if (!boards) {
+    boards = buildDailyBoards(enriched);
+    boardsCache.set(enriched, boards);
+  }
+  return boards;
+}
+
+const seasonsCache = new WeakMap<EnrichedMatch[], SeasonAward[]>();
+/** Player of the Year results, cached per match-log instance */
+export function seasonsFor(enriched: EnrichedMatch[]): SeasonAward[] {
+  let seasons = seasonsCache.get(enriched);
+  if (!seasons) {
+    seasons = computeSeasons(enriched, dailyBoardsFor(enriched));
+    seasonsCache.set(enriched, seasons);
+  }
+  return seasons;
 }
 
 /**
@@ -526,6 +552,7 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
         start: lossStart.get(winner) ?? m.date,
         end: m.date,
         matches: lossRunMatches.get(winner) ?? [],
+        endedBy: m,
       });
       lossRunMatches.delete(winner);
     }
@@ -545,6 +572,7 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
         start: winStart.get(loser) ?? m.date,
         end: m.date,
         matches: winRunMatches.get(loser) ?? [],
+        endedBy: m,
       });
       winRunMatches.delete(loser);
     }
@@ -580,6 +608,7 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
         start: winStart.get(name) ?? "",
         end: null,
         matches: winRunMatches.get(name) ?? [],
+        endedBy: null,
       });
     } else if (s < 0) {
       lossRuns.push({
@@ -588,6 +617,7 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
         start: lossStart.get(name) ?? "",
         end: null,
         matches: lossRunMatches.get(name) ?? [],
+        endedBy: null,
       });
     }
   }
@@ -595,7 +625,7 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const byLengthThenStart = (a: StreakRecord, b: StreakRecord) =>
     b.length - a.length || a.start.localeCompare(b.start);
 
-  const boards = buildDailyBoards(enriched);
+  const boards = dailyBoardsFor(enriched);
   const { reigns, topFive, giantKillers } = computeStandingsRecords(enriched, boards);
 
   return {
@@ -607,6 +637,6 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
     reigns,
     topFive,
     giantKillers,
-    seasons: computeSeasons(enriched, boards),
+    seasons: seasonsFor(enriched),
   };
 }

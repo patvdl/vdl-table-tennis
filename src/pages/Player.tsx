@@ -7,6 +7,7 @@ import Sparkline from "../components/Sparkline";
 import FormChart from "../components/FormChart";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
+import Crowns from "../components/Crowns";
 import Delta from "../components/Delta";
 import Avatar from "../components/Avatar";
 import PlayerName from "../components/PlayerName";
@@ -90,6 +91,7 @@ export default function PlayerPage() {
               ) : (
                 <span className="badge neutral">Unrated</span>
               )}
+              <Crowns player={player} />
               <Trophy player={player} />
               {playerActions}
             </h2>

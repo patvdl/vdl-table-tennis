@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { computeRecords } from "../lib/records";
 import type { RankSpan, StreakRecord } from "../lib/records";
@@ -61,6 +61,13 @@ export default function Records() {
   const [expandedWinRun, setExpandedWinRun] = useState<number | null>(null);
   const [expandedLossRun, setExpandedLossRun] = useState<number | null>(null);
   const [selYear, setSelYear] = useState<number | null>(null);
+
+  // Deep link from crown icons: /records?year=2024
+  const [searchParams] = useSearchParams();
+  const urlYear = searchParams.get("year");
+  useEffect(() => {
+    if (urlYear) setSelYear(Number(urlYear));
+  }, [urlYear]);
 
   const seasons = records.seasons;
   const season =
@@ -142,7 +149,7 @@ export default function Records() {
                     {season.inProgress && " · so far"}
                   </div>
                   <div className="record-value" style={{ fontSize: 30 }}>
-                    <PlayerLink name={poty.player} /> <Crown size="0.8em" />
+                    <PlayerLink name={poty.player} />
                   </div>
                   <div className="record-context">season score {poty.score} / 100</div>
                 </div>
@@ -224,7 +231,6 @@ export default function Records() {
                         <td className="rank-cell">{i + 1}</td>
                         <td>
                           <PlayerLink name={s.player} />
-                          {s.player === poty.player && <Crown />}
                         </td>
                         <td className="num" style={{ fontFamily: "var(--mono)" }}>
                           {s.wins}–{s.losses}
@@ -327,6 +333,34 @@ export default function Records() {
                                   )}
                                 </div>
                               ))}
+                              <div
+                                style={{
+                                  borderTop: "1px solid var(--border)",
+                                  paddingTop: 6,
+                                  marginTop: 2,
+                                }}
+                              >
+                                {s.endedBy ? (
+                                  <>
+                                    <span className="badge down" style={{ marginRight: 8 }}>
+                                      streak ended
+                                    </span>
+                                    {formatDate(s.endedBy.date)} — lost to{" "}
+                                    <PlayerLink name={s.endedBy.winnerName} />
+                                    {s.endedBy.score ? ` ${s.endedBy.score}` : ""}
+                                    {s.endedBy.tournament && (
+                                      <span
+                                        className="badge gold"
+                                        style={{ marginLeft: 8, fontSize: 11 }}
+                                      >
+                                        🏆 {s.endedBy.tournament}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="badge up">streak still active</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -422,6 +456,34 @@ export default function Records() {
                                   )}
                                 </div>
                               ))}
+                              <div
+                                style={{
+                                  borderTop: "1px solid var(--border)",
+                                  paddingTop: 6,
+                                  marginTop: 2,
+                                }}
+                              >
+                                {s.endedBy ? (
+                                  <>
+                                    <span className="badge up" style={{ marginRight: 8 }}>
+                                      streak ended
+                                    </span>
+                                    {formatDate(s.endedBy.date)} — beat{" "}
+                                    <PlayerLink name={s.endedBy.loserName} />
+                                    {s.endedBy.score ? ` ${s.endedBy.score}` : ""}
+                                    {s.endedBy.tournament && (
+                                      <span
+                                        className="badge gold"
+                                        style={{ marginLeft: 8, fontSize: 11 }}
+                                      >
+                                        🏆 {s.endedBy.tournament}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="badge down">streak still active</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -608,6 +670,9 @@ export default function Records() {
                         <PlayerLink name={u.winner} />{" "}
                         <span style={{ color: "var(--text-dim)" }}>beat</span>{" "}
                         <PlayerLink name={u.loser} />
+                        {u.match.score && (
+                          <span style={{ color: "var(--text-dim)" }}> {u.match.score}</span>
+                        )}
                       </td>
                       <td className="num" style={{ fontFamily: "var(--mono)" }}>
                         {(u.winProb * 100).toFixed(1)}%
