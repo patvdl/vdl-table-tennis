@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
-import { computeRecords, SEASON_MIN } from "../lib/records";
+import { computeRecords } from "../lib/records";
 import type { RankSpan, StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
 import { formatDate, pct, round0 } from "../lib/format";
@@ -108,9 +108,10 @@ export default function Records() {
             </div>
           </div>
           <p className="sub">
-            Judged on the whole season: win rate, number of wins, quality of wins
-            (beating top-5 and #1 ranked players), time spent at #1 and in the top 5,
-            and peak rating. Needs {SEASON_MIN}+ matches in the year to qualify.
+            Judged on the whole season, quality over quantity: win rate, time spent at
+            #1 and in the top 5, and peak rating carry the most weight, with quality of
+            wins (beating top-5 and #1 ranked players) and win count behind them. Every
+            rated player who played that year is in the race.
             {season.inProgress &&
               " This season is still in progress — the race can change with every match."}
           </p>
@@ -118,14 +119,29 @@ export default function Records() {
           {poty && (
             <>
               <div className="record-hero">
-                <Avatar player={poty.player} size={96} />
+                <div style={{ position: "relative" }}>
+                  <Avatar player={poty.player} size={96} />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -16,
+                      left: -8,
+                      fontSize: 30,
+                      transform: "rotate(-24deg)",
+                      textShadow: "0 2px 6px rgba(0,0,0,0.6)",
+                    }}
+                    aria-hidden
+                  >
+                    👑
+                  </span>
+                </div>
                 <div>
                   <div className="record-context">
                     🏆 Player of the Year {season.year}
                     {season.inProgress && " · so far"}
                   </div>
                   <div className="record-value" style={{ fontSize: 30 }}>
-                    <PlayerLink name={poty.player} />
+                    <PlayerLink name={poty.player} /> <span aria-hidden>👑</span>
                   </div>
                   <div className="record-context">season score {poty.score} / 100</div>
                 </div>
@@ -202,16 +218,11 @@ export default function Records() {
                   </thead>
                   <tbody>
                     {season.standings.slice(0, 10).map((s, i) => (
-                      <tr key={s.player} style={s.eligible ? undefined : { opacity: 0.55 }}>
+                      <tr key={s.player}>
                         <td className="rank-cell">{i + 1}</td>
                         <td>
                           <PlayerLink name={s.player} />{" "}
-                          {s.player === poty.player && <span className="badge gold">🏆</span>}
-                          {!s.eligible && (
-                            <span className="badge neutral" style={{ marginLeft: 6 }}>
-                              {s.played} {s.played === 1 ? "match" : "matches"}
-                            </span>
-                          )}
+                          {s.player === poty.player && <span aria-hidden>👑</span>}
                         </td>
                         <td className="num" style={{ fontFamily: "var(--mono)" }}>
                           {s.wins}–{s.losses}

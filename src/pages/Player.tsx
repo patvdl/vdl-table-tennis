@@ -9,6 +9,7 @@ import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import Delta from "../components/Delta";
 import Avatar from "../components/Avatar";
+import Bunny from "../components/Bunny";
 import PlayerActions from "../components/PlayerActions";
 
 const RECENT = 5;
@@ -59,7 +60,9 @@ export default function PlayerPage() {
           <Avatar player={player} size={240} />
           <div>
             <h2 style={{ marginBottom: 2 }}>
-              {player} {isRegistered && <span className="badge neutral">Unrated</span>}
+              {player}
+              {player === "Emily" && <Bunny />}{" "}
+              {isRegistered && <span className="badge neutral">Unrated</span>}
               {isRegistered && playerActions}
             </h2>
             <p className="sub" style={{ margin: 0 }}>
@@ -82,7 +85,8 @@ export default function PlayerPage() {
           <Avatar player={player} size={240} />
           <div>
             <h2 style={{ marginBottom: 2 }}>
-              {player}{" "}
+              {player}
+              {player === "Emily" && <Bunny />}{" "}
               {isRated ? (
                 <span className={`badge ${rank === 1 ? "gold" : "neutral"}`}>#{rank}</span>
               ) : (

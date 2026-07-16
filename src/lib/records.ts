@@ -77,9 +77,6 @@ export interface ReignRecord {
   spans: RankSpan[];
 }
 
-/** Matches a player must have in a calendar year to qualify for the award */
-export const SEASON_MIN = 10;
-
 export interface SeasonStats {
   player: string;
   played: number;
@@ -101,7 +98,6 @@ export interface SeasonStats {
   endRating: number | null;
   /** Highest rating held while ranked during the year */
   peakRating: number | null;
-  eligible: boolean;
   /** Composite season score, 0–100 */
   score: number;
 }
@@ -298,14 +294,15 @@ function computeStandingsRecords(
 
 /**
  * Player of the Year. Every player's season is condensed into a 0–100
- * score blending five signals, each normalised against the year's best:
- * - 30% win rate
- * - 20% number of wins
- * - 20% quality of wins (top-5 scalps, with wins over the #1 double-weighted)
- * - 20% dominance (days at #1, plus days in the top 5 at half weight)
- * - 10% peak rating during the year
- * The award needs SEASON_MIN matches in the year; if nobody qualifies
- * (very early in a season) the best score so far wins provisionally.
+ * score blending five signals — quality over quantity:
+ * - 25% win rate (taken raw, so grinding volume can't buy it back)
+ * - 25% dominance (days at #1, plus days in the top 5 at half weight)
+ * - 25% peak rating during the year
+ * - 15% quality of wins (top-5 scalps, with wins over the #1 double-weighted)
+ * - 10% number of wins
+ * All but win rate are normalised against the year's best. Only players
+ * who were rated (ranked on the board) during the year are listed;
+ * there's no minimum match count beyond being rated.
  */
 function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): SeasonAward[] {
   if (enriched.length === 0) return [];
@@ -339,7 +336,6 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
         endRank: null,
         endRating: null,
         peakRating: null,
-        eligible: false,
         score: 0,
       };
       ymap.set(name, s);
@@ -421,42 +417,41 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
   // Score each season
   return years.map((year) => {
     const list = [...(byYear.get(year)?.values() ?? [])];
-    for (const s of list) {
-      s.winPct = s.played > 0 ? s.wins / s.played : 0;
-      s.eligible = s.played >= SEASON_MIN;
-    }
-    const pool = list.some((s) => s.eligible) ? list.filter((s) => s.eligible) : list;
+    for (const s of list) s.winPct = s.played > 0 ? s.wins / s.played : 0;
+
+    // Only rated players compete — having appeared on the ranked board
+    // during the year means they had RATED_MIN+ career matches by then.
+    const rated = list.filter((s) => s.bestRank !== null);
 
     const quality = (s: SeasonStats) => s.topFiveWins + s.no1Wins; // #1 wins count twice
     const dominance = (s: SeasonStats) => s.daysAtNo1 + 0.5 * s.daysTop5;
     const ratingX = (s: SeasonStats) => Math.max(0, (s.peakRating ?? START_RATING) - START_RATING);
     const norm = (f: (s: SeasonStats) => number) => {
-      const max = Math.max(...pool.map(f), 0);
+      const max = Math.max(...rated.map(f), 0);
       return (s: SeasonStats) => (max > 0 ? Math.min(f(s) / max, 1) : 0);
     };
-    const nPct = norm((s) => s.winPct);
     const nWins = norm((s) => s.wins);
     const nQuality = norm(quality);
     const nDominance = norm(dominance);
     const nRating = norm(ratingX);
 
-    for (const s of list) {
+    for (const s of rated) {
       s.score =
         Math.round(
           100 *
-            (0.3 * nPct(s) +
-              0.2 * nWins(s) +
-              0.2 * nQuality(s) +
-              0.2 * nDominance(s) +
-              0.1 * nRating(s)) *
+            (0.25 * s.winPct +
+              0.25 * nDominance(s) +
+              0.25 * nRating(s) +
+              0.15 * nQuality(s) +
+              0.1 * nWins(s)) *
             10,
         ) / 10;
     }
 
-    const standings = list.sort(
-      (a, b) => b.score - a.score || b.wins - a.wins || b.winPct - a.winPct,
+    const standings = rated.sort(
+      (a, b) => b.score - a.score || b.winPct - a.winPct || b.wins - a.wins,
     );
-    const winner = standings.find((s) => s.eligible) ?? standings[0] ?? null;
+    const winner = standings[0] ?? null;
 
     return { year, inProgress: year === currentYear, winner, standings };
   });
