@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { headToHead, RATED_MIN, START_RATING } from "../lib/elo";
+import { playerStreaks, bestCareerWin } from "../lib/records";
+import type { StreakRecord } from "../lib/records";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import FormChart from "../components/FormChart";
@@ -33,6 +35,16 @@ export default function PlayerPage() {
   const stats = replayResult.stats.get(player);
   const rank = board.findIndex((p) => p.name === player) + 1;
   const [showAllMatches, setShowAllMatches] = useState(false);
+  const [streakModal, setStreakModal] = useState<"win" | "loss" | null>(null);
+
+  const streaks = useMemo(
+    () => playerStreaks(replayResult.enriched, player),
+    [player, replayResult],
+  );
+  const bestWin = useMemo(
+    () => bestCareerWin(replayResult.enriched, player),
+    [player, replayResult],
+  );
 
   // Oldest first, for the form chart
   const chronological = useMemo(
@@ -140,6 +152,24 @@ export default function PlayerPage() {
             <div className="hint">{pct(stats.wins / Math.max(stats.played, 1))} win rate</div>
           </div>
           <div className="stat-tile">
+            <div className="label">Best win</div>
+            {bestWin ? (
+              <>
+                <div className="value">#{bestWin.opponentRank}</div>
+                <div className="hint">
+                  beat <PlayerName name={bestWin.match.loserName} /> ·{" "}
+                  {formatDate(bestWin.match.date)}
+                  {bestWin.match.score ? ` · ${bestWin.match.score}` : ""}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">no wins over ranked players yet</div>
+              </>
+            )}
+          </div>
+          <div className="stat-tile">
             <div className="label">Career-high rank</div>
             {stats.bestRankDate ? (
               <>
@@ -161,16 +191,51 @@ export default function PlayerPage() {
           </div>
           <div className="stat-tile">
             <div className="label">Best win streak</div>
-            <div className="value">W{stats.bestStreak}</div>
-            <div className="hint">
-              {stats.bestStreak === 0
-                ? "no wins yet"
-                : `started ${formatDate(stats.bestStreakStart)} · ${
-                    stats.bestStreakEnd
-                      ? `lost ${formatDate(stats.bestStreakEnd)}`
-                      : "still active"
-                  }`}
+            <div className="value">
+              {streaks.bestWin ? `W${streaks.bestWin.length}` : "—"}
             </div>
+            <div className="hint">
+              {streaks.bestWin
+                ? `started ${formatDate(streaks.bestWin.start)} · ${
+                    streaks.bestWin.end
+                      ? `lost ${formatDate(streaks.bestWin.end)}`
+                      : "still active"
+                  }`
+                : "no wins yet"}
+            </div>
+            {streaks.bestWin && (
+              <button
+                className="btn ghost"
+                style={{ padding: "3px 12px", fontSize: 11, marginTop: 8 }}
+                onClick={() => setStreakModal("win")}
+              >
+                Details
+              </button>
+            )}
+          </div>
+          <div className="stat-tile">
+            <div className="label">Worst losing streak</div>
+            <div className="value">
+              {streaks.worstLoss ? `L${streaks.worstLoss.length}` : "—"}
+            </div>
+            <div className="hint">
+              {streaks.worstLoss
+                ? `started ${formatDate(streaks.worstLoss.start)} · ${
+                    streaks.worstLoss.end
+                      ? `won ${formatDate(streaks.worstLoss.end)}`
+                      : "still active"
+                  }`
+                : "no losses yet"}
+            </div>
+            {streaks.worstLoss && (
+              <button
+                className="btn ghost"
+                style={{ padding: "3px 12px", fontSize: 11, marginTop: 8 }}
+                onClick={() => setStreakModal("loss")}
+              >
+                Details
+              </button>
+            )}
           </div>
           <div className="stat-tile">
             <div className="label">Last played</div>
@@ -336,6 +401,104 @@ export default function PlayerPage() {
           </table>
         </div>
       </div>
+
+      {streakModal && (
+        <StreakModal
+          player={player}
+          kind={streakModal}
+          streak={streakModal === "win" ? streaks.bestWin! : streaks.worstLoss!}
+          onClose={() => setStreakModal(null)}
+        />
+      )}
     </>
+  );
+}
+
+/** Every match inside a streak, plus the one that broke it */
+function StreakModal({
+  player,
+  kind,
+  streak,
+  onClose,
+}: {
+  player: string;
+  kind: "win" | "loss";
+  streak: StreakRecord;
+  onClose: () => void;
+}) {
+  const won = kind === "win";
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>
+          {won ? "Best win streak" : "Worst losing streak"} —{" "}
+          <span className={won ? "win-a" : "delta-down"}>
+            {won ? "W" : "L"}
+            {streak.length}
+          </span>
+        </h2>
+        <p className="sub">
+          {formatDate(streak.start)} → {streak.end ? formatDate(streak.end) : "still active"}
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gap: 5,
+            fontSize: 13,
+            color: "var(--text-dim)",
+            maxHeight: "55vh",
+            overflowY: "auto",
+          }}
+        >
+          {streak.matches.map((m, i) => {
+            const opponent = m.player1 === player ? m.player2 : m.player1;
+            return (
+              <div key={m.id}>
+                <span className="rank-cell">{i + 1}.</span> {formatDate(m.date)} —{" "}
+                {won ? "beat" : "lost to"}{" "}
+                <Link className="player-link" to={`/player/${encodeURIComponent(opponent)}`}>
+                  <PlayerName name={opponent} />
+                </Link>
+                {m.score ? ` ${m.score}` : ""}
+                {m.tournament && (
+                  <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
+                    🏆 {m.tournament}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 3 }}>
+            {streak.endedBy ? (
+              <>
+                <span className={`badge ${won ? "down" : "up"}`} style={{ marginRight: 8 }}>
+                  streak ended
+                </span>
+                {formatDate(streak.endedBy.date)} —{" "}
+                {won ? "lost to" : "beat"}{" "}
+                <Link
+                  className="player-link"
+                  to={`/player/${encodeURIComponent(
+                    won ? streak.endedBy.winnerName : streak.endedBy.loserName,
+                  )}`}
+                >
+                  <PlayerName
+                    name={won ? streak.endedBy.winnerName : streak.endedBy.loserName}
+                  />
+                </Link>
+                {streak.endedBy.score ? ` ${streak.endedBy.score}` : ""}
+              </>
+            ) : (
+              <span className={`badge ${won ? "up" : "down"}`}>streak still active</span>
+            )}
+          </div>
+        </div>
+        <div style={{ marginTop: 16, textAlign: "right" }}>
+          <button className="btn ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -688,7 +688,8 @@ input[type="checkbox"]:checked::after {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 20px;
-  align-items: start;
+  /* cards stretch so each pair lines up, even when one has less content */
+  align-items: stretch;
 }
 
 .records-grid > .card + .card {

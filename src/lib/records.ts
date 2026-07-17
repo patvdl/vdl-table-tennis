@@ -66,6 +66,13 @@ export interface RatingExtreme {
   date: string;
 }
 
+/** Career tally of wins by a specific set scoreline (3-0 sweeps, 3-2 deciders) */
+export interface SetScoreRecord {
+  player: string;
+  count: number;
+  latest: string;
+}
+
 export interface ReignRecord {
   player: string;
   /** Total full days spent at #1 across all reigns */
@@ -89,6 +96,8 @@ export interface SeasonStats {
   topFiveWins: number;
   /** Wins over the reigning #1 */
   no1Wins: number;
+  /** Matches played against the reigning #1 */
+  no1Played: number;
   /** Highest-ranked opponent beaten during the year */
   bestWin: { opponent: string; opponentRank: number; date: string } | null;
   daysAtNo1: number;
@@ -122,7 +131,28 @@ export interface RecordBook {
   reigns: ReignRecord[]; // most days at #1 first
   topFive: TopFiveRecord[]; // most days ranked in the top 5 first
   giantKillers: GiantKillerRecord[]; // most wins over reigning #1s first
+  sweeps: SetScoreRecord[]; // most 3-0 wins first
+  deciders: SetScoreRecord[]; // most 3-2 wins first
   seasons: SeasonAward[]; // player of the year, oldest year first
+}
+
+/**
+ * Reads a best-of-5 set scoreline out of a recorded score, winner first.
+ * Returns "3-0" | "3-1" | "3-2", or null for point scores ("21-15"),
+ * missing scores, or anything else.
+ */
+export function parseSetScore(score: string | null): string | null {
+  if (!score) return null;
+  const m = score
+    .trim()
+    .toLowerCase()
+    .replace(/\s*sets?$/, "")
+    .replace(/\s+/g, "")
+    .match(/^(\d+)[-–](\d+)$/);
+  if (!m) return null;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return a === 3 && b >= 0 && b <= 2 ? `3-${b}` : null;
 }
 
 function pairKey(a: string, b: string): string {
@@ -355,6 +385,7 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
         winPct: 0,
         topFiveWins: 0,
         no1Wins: 0,
+        no1Played: 0,
         bestWin: null,
         daysAtNo1: 0,
         daysTop5: 0,
@@ -375,8 +406,14 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
     boardBefore.set(boards[i].date, i > 0 ? boards[i - 1].board : []);
   }
 
-  // Match tallies and quality wins
-  for (const m of enriched) {
+  // Match tallies, quality wins and peak ratings. Peaks are tracked per
+  // match from the canonical replay (never from the end-of-day boards) so
+  // they always agree with the career profile — boards miss intra-day
+  // crests, and their date-filtered replay can drift from the real match
+  // order. The before-match rating covers a peak carried in from the
+  // previous year; only rated moments count, same rule as the record book.
+  const careerPlayed = new Map<string, number>();
+  for (const m of [...enriched].sort((x, y) => x.seq - y.seq)) {
     const year = Number(m.date.slice(0, 4));
     const w = ensure(year, m.winnerName);
     const l = ensure(year, m.loserName);
@@ -386,14 +423,33 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
     l.losses++;
 
     const before = boardBefore.get(m.date) ?? [];
-    const rank = before.findIndex((p) => p.name === m.loserName) + 1;
-    if (rank > 0) {
-      if (rank === 1) w.no1Wins++;
-      if (rank <= 5) w.topFiveWins++;
-      if (!w.bestWin || rank < w.bestWin.opponentRank) {
-        w.bestWin = { opponent: m.loserName, opponentRank: rank, date: m.date };
+    const loserRank = before.findIndex((p) => p.name === m.loserName) + 1;
+    const winnerRank = before.findIndex((p) => p.name === m.winnerName) + 1;
+    if (loserRank === 1) {
+      w.no1Wins++;
+      w.no1Played++;
+    }
+    if (winnerRank === 1) l.no1Played++;
+    if (loserRank > 0) {
+      if (loserRank <= 5) w.topFiveWins++;
+      if (!w.bestWin || loserRank < w.bestWin.opponentRank) {
+        w.bestWin = { opponent: m.loserName, opponentRank: loserRank, date: m.date };
       }
     }
+
+    const played1Before = careerPlayed.get(m.player1) ?? 0;
+    const played2Before = careerPlayed.get(m.player2) ?? 0;
+    careerPlayed.set(m.player1, played1Before + 1);
+    careerPlayed.set(m.player2, played2Before + 1);
+    const s1 = ensure(year, m.player1);
+    const s2 = ensure(year, m.player2);
+    const bump = (s: SeasonStats, rating: number) => {
+      if (s.peakRating === null || rating > s.peakRating) s.peakRating = rating;
+    };
+    if (played1Before >= RATED_MIN) bump(s1, m.rating1Before);
+    if (played1Before + 1 >= RATED_MIN) bump(s1, m.rating1After);
+    if (played2Before >= RATED_MIN) bump(s2, m.rating2Before);
+    if (played2Before + 1 >= RATED_MIN) bump(s2, m.rating2After);
   }
 
   // Time-based signals: each board holds from its date until the next
@@ -425,15 +481,14 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
         }
       }
 
-      // Ranks/ratings held while this board was in effect during `year`.
-      // Later boards overwrite endRank, so the last one standing is the
-      // year-end (or current) position.
+      // Ranks held while this board was in effect during `year`. Later
+      // boards overwrite endRank, so the last one standing is the year-end
+      // (or current) position. (Peak rating is tracked per match above.)
       board.forEach((p, idx) => {
         const s = ymap.get(p.name);
         if (!s) return;
         const rank = idx + 1;
         if (s.bestRank === null || rank < s.bestRank) s.bestRank = rank;
-        if (s.peakRating === null || p.rating > s.peakRating) s.peakRating = p.rating;
         s.endRank = rank;
         s.endRating = p.rating;
       });
@@ -496,6 +551,8 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const lowest = new Map<string, RatingExtreme>();
   const pairWinners = new Map<string, string[]>(); // chronological winner names
   const upsets: UpsetRecord[] = [];
+  const sweeps = new Map<string, SetScoreRecord>(); // 3-0 wins
+  const deciders = new Map<string, SetScoreRecord>(); // 3-2 wins
 
   const ordered = [...enriched].sort((a, b) => a.seq - b.seq);
 
@@ -536,6 +593,16 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
 
     winners.push(m.winnerName);
     pairWinners.set(key, winners);
+
+    // Set-scoreline tallies — only matches recorded with a sets score count
+    const setScore = parseSetScore(m.score);
+    if (setScore === "3-0" || setScore === "3-2") {
+      const map = setScore === "3-0" ? sweeps : deciders;
+      const rec = map.get(m.winnerName) ?? { player: m.winnerName, count: 0, latest: m.date };
+      rec.count++;
+      rec.latest = m.date;
+      map.set(m.winnerName, rec);
+    }
 
     // Streak runs — every run is recorded individually when it ends, so
     // one player can hold several spots in the top-5 lists.
@@ -637,6 +704,81 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
     reigns,
     topFive,
     giantKillers,
+    sweeps: [...sweeps.values()].sort(
+      (a, b) => b.count - a.count || a.latest.localeCompare(b.latest),
+    ),
+    deciders: [...deciders.values()].sort(
+      (a, b) => b.count - a.count || a.latest.localeCompare(b.latest),
+    ),
     seasons: seasonsFor(enriched),
   };
+}
+
+/**
+ * A single player's streak history: their best run of consecutive wins and
+ * worst run of consecutive losses, with the matches inside each and the
+ * match that broke it. Cheap enough to run on the profile page directly.
+ */
+export function playerStreaks(
+  enriched: EnrichedMatch[],
+  player: string,
+): { bestWin: StreakRecord | null; worstLoss: StreakRecord | null } {
+  const mine = enriched
+    .filter((m) => m.player1 === player || m.player2 === player)
+    .sort((a, b) => a.seq - b.seq);
+
+  const runs: StreakRecord[] = [];
+  let current: StreakRecord | null = null;
+  let winning = false;
+
+  for (const m of mine) {
+    const won = m.winnerName === player;
+    if (current && won === winning) {
+      current.length++;
+      current.matches.push(m);
+    } else {
+      if (current) {
+        current.end = m.date;
+        current.endedBy = m;
+      }
+      current = { player, length: 1, start: m.date, end: null, matches: [m], endedBy: null };
+      winning = won;
+      runs.push(current);
+    }
+  }
+
+  const wins = runs.filter((r) => r.matches[0].winnerName === player);
+  const losses = runs.filter((r) => r.matches[0].winnerName !== player);
+  const best = (list: StreakRecord[]) =>
+    list.length === 0
+      ? null
+      : list.reduce((a, b) => (b.length > a.length ? b : a));
+
+  return { bestWin: best(wins), worstLoss: best(losses) };
+}
+
+/**
+ * The best win of a player's career: the victory over the highest-ranked
+ * opponent (rank as the standings stood going into that match day).
+ * Earliest such scalp wins ties.
+ */
+export function bestCareerWin(
+  enriched: EnrichedMatch[],
+  player: string,
+): { match: EnrichedMatch; opponentRank: number } | null {
+  const boards = dailyBoardsFor(enriched);
+  const boardBefore = new Map<string, DailyBoard["board"]>();
+  for (let i = 0; i < boards.length; i++) {
+    boardBefore.set(boards[i].date, i > 0 ? boards[i - 1].board : []);
+  }
+
+  let best: { match: EnrichedMatch; opponentRank: number } | null = null;
+  for (const m of enriched) {
+    if (m.winnerName !== player) continue;
+    const rank = (boardBefore.get(m.date) ?? []).findIndex((p) => p.name === m.loserName) + 1;
+    if (rank > 0 && (!best || rank < best.opponentRank)) {
+      best = { match: m, opponentRank: rank };
+    }
+  }
+  return best;
 }

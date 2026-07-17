@@ -10,6 +10,7 @@ import Crown from "../components/Crown";
 import PlayerName from "../components/PlayerName";
 
 const TOP_N = 5;
+const MAX_N = 10;
 
 function PlayerLink({ name }: { name: string }) {
   return (
@@ -61,6 +62,22 @@ export default function Records() {
   const [expandedWinRun, setExpandedWinRun] = useState<number | null>(null);
   const [expandedLossRun, setExpandedLossRun] = useState<number | null>(null);
   const [selYear, setSelYear] = useState<number | null>(null);
+  const [potyOpen, setPotyOpen] = useState(false);
+  const [moreCards, setMoreCards] = useState<Record<string, boolean>>({});
+
+  const shown = (key: string) => (moreCards[key] ? MAX_N : TOP_N);
+  const seeMore = (key: string, total: number) =>
+    total > TOP_N ? (
+      <div style={{ marginTop: 10, textAlign: "center" }}>
+        <button
+          className="btn ghost"
+          style={{ padding: "4px 16px", fontSize: 12 }}
+          onClick={() => setMoreCards((m) => ({ ...m, [key]: !m[key] }))}
+        >
+          {moreCards[key] ? "See less" : `See more (top ${Math.min(total, MAX_N)})`}
+        </button>
+      </div>
+    ) : null;
 
   // Deep link from crown icons: /records?year=2024
   const [searchParams] = useSearchParams();
@@ -116,18 +133,20 @@ export default function Records() {
               ))}
             </div>
           </div>
-          <p className="sub">
-            Judged on the whole season, quality over quantity: win rate, time spent at
-            #1 and in the top 5, and peak rating carry the most weight, with quality of
-            wins (beating top-5 and #1 ranked players) and win count behind them. Every
-            rated player who played that year is in the race.
-            {season.inProgress &&
-              " This season is still in progress — the race can change with every match."}
-          </p>
+          {potyOpen && (
+            <p className="sub">
+              Judged on the whole season, quality over quantity: win rate, time spent at
+              #1 and in the top 5, and peak rating carry the most weight, with quality of
+              wins (beating top-5 and #1 ranked players) and win count behind them. Every
+              rated player who played that year is in the race.
+              {season.inProgress &&
+                " This season is still in progress — the race can change with every match."}
+            </p>
+          )}
 
           {poty && (
             <>
-              <div className="record-hero">
+              <div className="record-hero" style={{ marginTop: potyOpen ? 0 : 12 }}>
                 <div style={{ position: "relative" }}>
                   <Avatar player={poty.player} size={96} />
                   <span
@@ -155,7 +174,19 @@ export default function Records() {
                 </div>
               </div>
 
-              <div className="stat-grid" style={{ marginBottom: 16 }}>
+              <div style={{ marginTop: 4 }}>
+                <button
+                  className="btn ghost"
+                  style={{ padding: "4px 16px", fontSize: 12 }}
+                  onClick={() => setPotyOpen((v) => !v)}
+                >
+                  {potyOpen ? "See less" : "See more"}
+                </button>
+              </div>
+
+              {potyOpen && (
+              <>
+              <div className="stat-grid" style={{ marginBottom: 16, marginTop: 16 }}>
                 <div className="stat-tile">
                   <div className="label">Record</div>
                   <div className="value">
@@ -177,7 +208,9 @@ export default function Records() {
                 <div className="stat-tile">
                   <div className="label">Top-5 wins</div>
                   <div className="value">{poty.topFiveWins}</div>
-                  <div className="hint">{poty.no1Wins} over the #1</div>
+                  <div className="hint">
+                    {poty.no1Wins} of {poty.no1Played} over the #1
+                  </div>
                 </div>
                 <div className="stat-tile">
                   <div className="label">Best win</div>
@@ -246,6 +279,8 @@ export default function Records() {
                   </tbody>
                 </table>
               </div>
+              </>
+              )}
             </>
           )}
         </div>
@@ -281,7 +316,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {winList.slice(0, TOP_N).map((s, i) => (
+                  {winList.slice(0, shown("winStreak")).map((s, i) => (
                     <Fragment key={i}>
                       <tr>
                         <td className="rank-cell">{i + 1}</td>
@@ -370,6 +405,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("winStreak", winList.length)}
           </>
         ) : (
           <p className="sub">No matches yet.</p>
@@ -406,7 +442,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {lossList.slice(0, TOP_N).map((s, i) => (
+                  {lossList.slice(0, shown("lossStreak")).map((s, i) => (
                     <Fragment key={i}>
                       <tr>
                         <td className="rank-cell">{i + 1}</td>
@@ -493,6 +529,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("lossStreak", lossList.length)}
           </>
         ) : (
           <p className="sub">No matches yet.</p>
@@ -518,7 +555,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.reigns.slice(0, TOP_N).map((r, i) => (
+                  {records.reigns.slice(0, shown("reigns")).map((r, i) => (
                     <Fragment key={r.player}>
                       <tr>
                         <td className="rank-cell">{i + 1}</td>
@@ -569,6 +606,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("reigns", records.reigns.length)}
           </>
         ) : (
           <p className="sub">Nobody has been ranked yet.</p>
@@ -588,7 +626,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.topFive.slice(0, TOP_N).map((t, i) => (
+                  {records.topFive.slice(0, shown("topFive")).map((t, i) => (
                     <Fragment key={t.player}>
                       <tr>
                         <td className="rank-cell">{i + 1}</td>
@@ -636,6 +674,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("topFive", records.topFive.length)}
           </>
         ) : (
           <p className="sub">Nobody has been ranked yet.</p>
@@ -663,7 +702,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.upsets.slice(0, TOP_N).map((u, i) => (
+                  {records.upsets.slice(0, shown("upsets")).map((u, i) => (
                     <tr key={u.match.id}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
@@ -683,6 +722,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("upsets", records.upsets.length)}
           </>
         ) : (
           <p className="sub">No upsets between rated players yet.</p>
@@ -743,7 +783,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.giantKillers.slice(0, TOP_N).map((g, i) => (
+                  {records.giantKillers.slice(0, shown("killers")).map((g, i) => (
                     <Fragment key={g.player}>
                       <tr>
                         <td className="rank-cell">{i + 1}</td>
@@ -805,6 +845,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("killers", records.giantKillers.length)}
           </>
         ) : (
           <p className="sub">Nobody has beaten a reigning #1 yet.</p>
@@ -824,7 +865,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.highest.slice(0, TOP_N).map((r, i) => (
+                  {records.highest.slice(0, shown("highest")).map((r, i) => (
                     <tr key={r.player}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
@@ -837,6 +878,7 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("highest", records.highest.length)}
           </>
         ) : (
           <p className="sub">Nobody has been ranked yet — players need {RATED_MIN} matches.</p>
@@ -856,7 +898,7 @@ export default function Records() {
             <div className="table-wrap">
               <table>
                 <tbody>
-                  {records.lowest.slice(0, TOP_N).map((r, i) => (
+                  {records.lowest.slice(0, shown("lowest")).map((r, i) => (
                     <tr key={r.player}>
                       <td className="rank-cell">{i + 1}</td>
                       <td>
@@ -869,9 +911,92 @@ export default function Records() {
                 </tbody>
               </table>
             </div>
+            {seeMore("lowest", records.lowest.length)}
           </>
         ) : (
           <p className="sub">Nobody has been ranked yet — players need {RATED_MIN} matches.</p>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Most 3-0 wins</h2>
+        <p className="sub">
+          Best-of-5 sweeps — winning without dropping a set. Only matches with a
+          recorded sets score count.
+        </p>
+        {records.sweeps.length > 0 ? (
+          <>
+            <Hero
+              player={records.sweeps[0].player}
+              value={`${records.sweeps[0].count} ${records.sweeps[0].count === 1 ? "sweep" : "sweeps"}`}
+              valueClass="delta-up"
+              context={`latest ${formatDate(records.sweeps[0].latest)}`}
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {records.sweeps.slice(0, shown("sweeps")).map((r, i) => (
+                    <tr key={r.player}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={r.player} />
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {r.count}× 3-0
+                      </td>
+                      <td style={{ color: "var(--text-dim)" }}>
+                        latest {formatDate(r.latest)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {seeMore("sweeps", records.sweeps.length)}
+          </>
+        ) : (
+          <p className="sub">No 3-0 wins with a recorded sets score yet.</p>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Most 3-2 wins</h2>
+        <p className="sub">
+          Five-set thrillers — winning the full-distance decider. Only matches with a
+          recorded sets score count.
+        </p>
+        {records.deciders.length > 0 ? (
+          <>
+            <Hero
+              player={records.deciders[0].player}
+              value={`${records.deciders[0].count} ${records.deciders[0].count === 1 ? "decider" : "deciders"}`}
+              valueClass="delta-up"
+              context={`latest ${formatDate(records.deciders[0].latest)}`}
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {records.deciders.slice(0, shown("deciders")).map((r, i) => (
+                    <tr key={r.player}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={r.player} />
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {r.count}× 3-2
+                      </td>
+                      <td style={{ color: "var(--text-dim)" }}>
+                        latest {formatDate(r.latest)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {seeMore("deciders", records.deciders.length)}
+          </>
+        ) : (
+          <p className="sub">No 3-2 wins with a recorded sets score yet.</p>
         )}
       </div>
     </div>

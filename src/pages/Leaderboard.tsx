@@ -151,6 +151,20 @@ export default function Leaderboard() {
     [matches, today],
   );
 
+  // One button per season, first season to the current one — a new year
+  // appears here automatically on January 1st.
+  const seasonYears = useMemo(() => {
+    const first = Number(firstDate.slice(0, 4));
+    const now = Number(today.slice(0, 4));
+    const years: number[] = [];
+    for (let y = first; y <= now; y++) years.push(y);
+    return years;
+  }, [firstDate, today]);
+
+  // Past seasons jump to their year-end standings; the current one is live
+  const seasonDate = (year: number) =>
+    year === Number(today.slice(0, 4)) ? "" : `${year}-12-31`;
+
   // Time machine: replay only the matches played on/before the chosen date
   const view = useMemo(() => {
     if (!asOf || asOf >= today)
@@ -263,6 +277,26 @@ export default function Leaderboard() {
           marginBottom: 16,
         }}
       >
+        <div>
+          <label className="field">Season</label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {seasonYears.map((y) => {
+              const target = seasonDate(y);
+              const active = (asOf || "") === target;
+              return (
+                <button
+                  key={y}
+                  className={`btn ${active ? "" : "ghost"}`}
+                  style={{ padding: "6px 14px", fontSize: 13 }}
+                  title={target ? `Year-end standings, ${formatDate(target)}` : "Live standings"}
+                  onClick={() => setAsOf(target)}
+                >
+                  {y}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div style={{ maxWidth: 220 }}>
           <label className="field">View rankings on date</label>
           <input
