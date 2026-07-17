@@ -3,6 +3,8 @@ interface Props {
   width?: number;
   height?: number;
   stroke?: string;
+  /** Stretch to the container's width (keeps aspect ratio) — for phone screens */
+  fluid?: boolean;
 }
 
 export default function Sparkline({
@@ -10,6 +12,7 @@ export default function Sparkline({
   width = 110,
   height = 28,
   stroke = "var(--accent)",
+  fluid = false,
 }: Props) {
   if (values.length < 2) return <span style={{ color: "var(--text-dim)" }}>—</span>;
 
@@ -27,7 +30,13 @@ export default function Sparkline({
     .join(" ");
 
   return (
-    <svg className="spark" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+    <svg
+      className="spark"
+      width={fluid ? "100%" : width}
+      height={fluid ? undefined : height}
+      viewBox={`0 0 ${width} ${height}`}
+      style={fluid ? { maxWidth: width } : undefined}
+    >
       <polyline
         points={pts}
         fill="none"

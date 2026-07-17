@@ -16,7 +16,7 @@ export default function Avatar({ player, size = 40 }: { player: string; size?: n
   const src = avatars.get(player);
 
   // Big avatars shrink on narrow phone screens instead of overflowing
-  const dim = size > 100 ? `min(${size}px, 36vw)` : `${size}px`;
+  const dim = size > 100 ? `min(${size}px, 30vw)` : `${size}px`;
 
   if (src) {
     return (

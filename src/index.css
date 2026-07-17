@@ -167,6 +167,8 @@ button {
 /* ---------- tables ---------- */
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 table {
@@ -863,6 +865,8 @@ input[type="checkbox"]:checked::after {
 .bracket-scroll {
   margin-top: 18px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   padding-bottom: 6px;
 }
 
@@ -1054,4 +1058,175 @@ input[type="checkbox"]:checked::after {
   text-align: center;
   color: var(--text-dim);
   font-size: 12px;
+}
+
+/* ================= mobile ================= */
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 0 12px 56px;
+  }
+
+  .site-header {
+    padding: 14px 0 10px;
+    gap: 10px;
+  }
+
+  .brand {
+    gap: 9px;
+  }
+
+  .brand-ball {
+    width: 28px;
+    height: 28px;
+  }
+
+  .brand h1 {
+    font-size: 17px;
+  }
+
+  .auth-area {
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  /* all tabs visible at once — no hidden horizontal scroll */
+  .nav {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 5px;
+    margin-bottom: 18px;
+  }
+
+  .nav a {
+    flex: 1 1 30%;
+    text-align: center;
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .card + .card {
+    margin-top: 14px;
+  }
+
+  .grid-2,
+  .records-grid {
+    gap: 14px;
+  }
+
+  table {
+    font-size: 13px;
+  }
+
+  th {
+    padding: 7px 9px;
+  }
+
+  td {
+    padding: 9px;
+  }
+
+  /* 16px text stops iOS Safari zooming the page when a field gets focus */
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 9px;
+  }
+
+  .stat-tile {
+    padding: 11px 12px;
+  }
+
+  .stat-tile .value {
+    font-size: 18px;
+  }
+
+  .h2h-hero {
+    gap: 8px;
+    padding: 14px 0;
+  }
+
+  .h2h-side .name {
+    font-size: 16px;
+  }
+
+  .h2h-side .big {
+    font-size: 34px;
+  }
+
+  .h2h-vs {
+    width: 38px;
+    height: 38px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .record-value {
+    font-size: 21px;
+  }
+
+  .record-hero {
+    gap: 11px;
+  }
+
+  .podium-tile {
+    flex: 1 1 42%;
+    padding: 9px 12px;
+  }
+
+  .modal {
+    padding: 18px;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  /* pinned columns: rank + player stay put while the stats scroll under them */
+  .pin-1 th:first-child,
+  .pin-1 td:first-child,
+  .pin-2 th:first-child,
+  .pin-2 td:first-child,
+  .pin-2 th:nth-child(2),
+  .pin-2 td:nth-child(2) {
+    position: sticky;
+    z-index: 2;
+    background: var(--bg-card);
+  }
+
+  .pin-1 th:first-child,
+  .pin-1 td:first-child,
+  .pin-2 th:nth-child(2),
+  .pin-2 td:nth-child(2) {
+    box-shadow: 10px 0 10px -10px #000000cc;
+  }
+
+  .pin-1 th:first-child,
+  .pin-1 td:first-child,
+  .pin-2 th:first-child,
+  .pin-2 td:first-child {
+    left: 0;
+  }
+
+  .pin-2 th:first-child,
+  .pin-2 td:first-child {
+    width: 38px;
+    min-width: 38px;
+  }
+
+  .pin-2 th:nth-child(2),
+  .pin-2 td:nth-child(2) {
+    left: 38px;
+  }
+
+  /* charts scale down with the viewport — keep their labels legible */
+  .trend-chart text {
+    font-size: 16px;
+  }
 }

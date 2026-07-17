@@ -81,7 +81,7 @@ export default function PlayerPage() {
   return (
     <>
       <div className="card">
-        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 16, flexWrap: "wrap" }}>
           <Avatar player={player} size={240} />
           <div>
             <h2 style={{ marginBottom: 2 }}>
@@ -189,7 +189,7 @@ export default function PlayerPage() {
         {isRated && (
           <div style={{ marginTop: 18 }}>
             <label className="field">Rating over time ({stats.played} matches)</label>
-            <Sparkline values={stats.history} width={640} height={80} />
+            <Sparkline values={stats.history} width={640} height={80} fluid />
           </div>
         )}
         {isRated && (
@@ -281,7 +281,7 @@ export default function PlayerPage() {
       <div className="card">
         <h2>Rivalries</h2>
         <p className="sub">Head-to-head record against every opponent.</p>
-        <div className="table-wrap">
+        <div className="table-wrap pin-1">
           <table>
             <thead>
               <tr>

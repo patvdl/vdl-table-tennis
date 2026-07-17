@@ -285,7 +285,7 @@ export default function Leaderboard() {
           No ranked players yet on this date — nobody had played {RATED_MIN} matches.
         </p>
       ) : (
-      <div className="table-wrap">
+      <div className="table-wrap pin-2">
         <table>
           <thead>
             <tr>
@@ -361,7 +361,7 @@ export default function Leaderboard() {
           Everyone joins the rankings after {RATED_MIN} matches. Results here are
           recorded (and count in head-to-heads), but don't earn a rating yet.
         </p>
-        <div className="table-wrap">
+        <div className="table-wrap pin-1">
           <table>
             <thead>
               <tr>

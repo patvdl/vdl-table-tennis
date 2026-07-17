@@ -240,7 +240,7 @@ export default function HeadToHeadPage() {
                 <PlayerName name={h2h.b} />
               </Link>
             </p>
-            <div className="table-wrap">
+            <div className="table-wrap pin-1">
               <table>
                 <thead>
                   <tr>

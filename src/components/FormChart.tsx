@@ -53,6 +53,7 @@ export default function FormChart({ matches, player }: Props) {
   return (
     <div>
       <svg
+        className="trend-chart"
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         style={{ display: "block" }}
