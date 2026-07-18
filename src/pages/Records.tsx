@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
+import { useAuth } from "../store/auth";
 import { computeRecords } from "../lib/records";
 import type { RankSpan, StreakRecord } from "../lib/records";
 import { RATED_MIN } from "../lib/elo";
@@ -8,6 +9,16 @@ import { formatDate, pct, round0 } from "../lib/format";
 import Avatar from "../components/Avatar";
 import Crown from "../components/Crown";
 import PlayerName from "../components/PlayerName";
+import PlayerCombo from "../components/PlayerCombo";
+
+/** "33-31" → { w: 33, l: 31, total: 64 }; null when it isn't a points score */
+function parseSetPoints(score: string): { w: number; l: number; total: number } | null {
+  const m = score.trim().match(/^(\d{1,3})\s*[-–]\s*(\d{1,3})$/);
+  if (!m) return null;
+  const w = Number(m[1]);
+  const l = Number(m[2]);
+  return { w, l, total: w + l };
+}
 
 const TOP_N = 5;
 const MAX_N = 10;
@@ -51,8 +62,82 @@ function bestPerPlayer(list: StreakRecord[]): StreakRecord[] {
 }
 
 export default function Records() {
-  const { replayResult } = useMatches();
+  const { replayResult, sets, addSetRecord, removeSetRecord } = useMatches();
+  const { role } = useAuth();
   const records = useMemo(() => computeRecords(replayResult.enriched), [replayResult]);
+
+  // Longest sets, most points played first
+  const longSets = useMemo(
+    () =>
+      [...sets].sort((a, b) => {
+        const pa = parseSetPoints(a.score);
+        const pb = parseSetPoints(b.score);
+        return (
+          (pb?.total ?? 0) - (pa?.total ?? 0) ||
+          (pb?.w ?? 0) - (pa?.w ?? 0) ||
+          a.date.localeCompare(b.date)
+        );
+      }),
+    [sets],
+  );
+
+  const [showAddSet, setShowAddSet] = useState(false);
+  const [setWinner, setSetWinner] = useState("");
+  const [setLoser, setSetLoser] = useState("");
+  const [setScore, setSetScore] = useState("");
+  const [setDate, setSetDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [setBusy, setSetBusy] = useState(false);
+  const [setErr, setSetErr] = useState<string | null>(null);
+
+  const submitSet = async (e: FormEvent) => {
+    e.preventDefault();
+    setSetErr(null);
+    const winner = setWinner.trim();
+    const loser = setLoser.trim();
+    const points = parseSetPoints(setScore);
+    if (!winner || !loser) {
+      setSetErr("Pick both players.");
+      return;
+    }
+    if (winner.toLowerCase() === loser.toLowerCase()) {
+      setSetErr("Winner and loser must be different players.");
+      return;
+    }
+    if (!points) {
+      setSetErr("Score must be points like 33-31 (winner first).");
+      return;
+    }
+    if (points.w <= points.l) {
+      setSetErr("The winner's points come first, so they must be higher.");
+      return;
+    }
+    setSetBusy(true);
+    try {
+      await addSetRecord({
+        date: setDate,
+        winner,
+        loser,
+        score: `${points.w}-${points.l}`,
+      });
+      setSetWinner("");
+      setSetLoser("");
+      setSetScore("");
+      setShowAddSet(false);
+    } catch (err) {
+      setSetErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSetBusy(false);
+    }
+  };
+
+  const deleteSet = async (id: string, label: string) => {
+    if (!confirm(`Delete the set ${label}?`)) return;
+    try {
+      await removeSetRecord(id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const [uniqueWins, setUniqueWins] = useState(false);
   const [uniqueLosses, setUniqueLosses] = useState(false);
@@ -120,18 +205,18 @@ export default function Records() {
         <div className="card records-span">
           <div className="card-head">
             <h2>Player of the Year</h2>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {seasons.map((s) => (
-                <button
-                  key={s.year}
-                  className={`btn ${season.year === s.year ? "" : "ghost"}`}
-                  style={{ padding: "4px 14px", fontSize: 12 }}
-                  onClick={() => setSelYear(s.year)}
-                >
+            <select
+              style={{ width: "auto", padding: "6px 32px 6px 12px", fontSize: 13 }}
+              value={season.year}
+              onChange={(e) => setSelYear(Number(e.target.value))}
+            >
+              {[...seasons].reverse().map((s) => (
+                <option key={s.year} value={s.year}>
                   {s.year}
-                </button>
+                  {s.inProgress ? " — in progress" : ""}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
           {potyOpen && (
             <p className="sub">
@@ -997,6 +1082,131 @@ export default function Records() {
           </>
         ) : (
           <p className="sub">No 3-2 wins with a recorded sets score yet.</p>
+        )}
+      </div>
+
+      <div className="card records-span">
+        <div className="card-head">
+          <h2>Longest set played</h2>
+          {role === "admin" && (
+            <button
+              className="btn ghost"
+              style={{ padding: "4px 14px", fontSize: 12 }}
+              onClick={() => {
+                setShowAddSet((v) => !v);
+                setSetErr(null);
+              }}
+            >
+              {showAddSet ? "Cancel" : "+ Add set"}
+            </button>
+          )}
+        </div>
+        <p className="sub">
+          Marathon deuce battles — the single sets with the most points played.
+          Match results don't record set points, so these are entered here as
+          they happen.
+        </p>
+
+        {showAddSet && role === "admin" && (
+          <form
+            onSubmit={submitSet}
+            style={{
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "flex-end",
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ minWidth: 160, flex: "1 1 160px" }}>
+              <label className="field">Set winner</label>
+              <PlayerCombo value={setWinner} onChange={setSetWinner} placeholder="Winner" />
+            </div>
+            <div style={{ minWidth: 160, flex: "1 1 160px" }}>
+              <label className="field">Set loser</label>
+              <PlayerCombo value={setLoser} onChange={setSetLoser} placeholder="Loser" />
+            </div>
+            <div style={{ width: 130 }}>
+              <label className="field">Set score</label>
+              <input
+                value={setScore}
+                onChange={(e) => setSetScore(e.target.value)}
+                placeholder="33-31"
+                inputMode="numeric"
+              />
+            </div>
+            <div style={{ width: 170 }}>
+              <label className="field">Date</label>
+              <input
+                type="date"
+                value={setDate}
+                onChange={(e) => setSetDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+            </div>
+            <button className="btn" type="submit" disabled={setBusy}>
+              {setBusy ? "Saving…" : "Save set"}
+            </button>
+            {setErr && (
+              <span style={{ color: "var(--red)", fontSize: 13, flexBasis: "100%" }}>
+                {setErr}
+              </span>
+            )}
+          </form>
+        )}
+
+        {longSets.length > 0 ? (
+          <>
+            <Hero
+              player={longSets[0].winner}
+              value={longSets[0].score}
+              context={`beat ${longSets[0].loser} · ${formatDate(longSets[0].date)} · ${
+                parseSetPoints(longSets[0].score)?.total ?? 0
+              } points played`}
+            />
+            <div className="table-wrap">
+              <table>
+                <tbody>
+                  {longSets.slice(0, shown("longSets")).map((s, i) => (
+                    <tr key={s.id}>
+                      <td className="rank-cell">{i + 1}</td>
+                      <td>
+                        <PlayerLink name={s.winner} />{" "}
+                        <span style={{ color: "var(--text-dim)" }}>beat</span>{" "}
+                        <PlayerLink name={s.loser} />
+                      </td>
+                      <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                        {s.score}
+                      </td>
+                      <td className="num" style={{ color: "var(--text-dim)" }}>
+                        {parseSetPoints(s.score)?.total ?? "—"} pts
+                      </td>
+                      <td style={{ color: "var(--text-dim)" }}>{formatDate(s.date)}</td>
+                      {role === "admin" && (
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            className="btn ghost"
+                            style={{ padding: "2px 10px", fontSize: 11 }}
+                            onClick={() =>
+                              deleteSet(s.id, `${s.winner} ${s.score} ${s.loser}`)
+                            }
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {seeMore("longSets", longSets.length)}
+          </>
+        ) : (
+          <p className="sub">
+            No marathon sets recorded yet.
+            {role === "admin" && " Use “+ Add set” when one happens."}
+          </p>
         )}
       </div>
     </div>

@@ -56,6 +56,17 @@ create table if not exists public.deleted_players (
   deleted_at timestamptz not null default now()
 );
 
+-- ============ set records (longest set played) ============
+create table if not exists public.set_records (
+  id uuid primary key default gen_random_uuid(),
+  date date not null,
+  winner text not null,
+  loser text not null,
+  -- winner's points first, e.g. '33-31'
+  score text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ============ profiles (roles) ============
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -100,6 +111,23 @@ alter table public.profiles enable row level security;
 alter table public.tournaments enable row level security;
 alter table public.players enable row level security;
 alter table public.deleted_players enable row level security;
+alter table public.set_records enable row level security;
+
+-- Everyone can read set records; only admins can manage them
+drop policy if exists "set records are public to read" on public.set_records;
+create policy "set records are public to read"
+  on public.set_records for select
+  using (true);
+
+drop policy if exists "admins can insert set records" on public.set_records;
+create policy "admins can insert set records"
+  on public.set_records for insert
+  with check (public.is_admin());
+
+drop policy if exists "admins can delete set records" on public.set_records;
+create policy "admins can delete set records"
+  on public.set_records for delete
+  using (public.is_admin());
 
 -- Trash is admin-only: reading, restoring and purging
 drop policy if exists "admins manage deleted players" on public.deleted_players;

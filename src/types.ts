@@ -65,6 +65,20 @@ export interface DeletedPlayer {
   deletedAt: string; // ISO timestamp
 }
 
+/**
+ * A single-set scoreline worth remembering (deuce marathons). Match results
+ * don't record per-set points, so admins enter these separately for the
+ * "Longest set played" record.
+ */
+export interface SetRecordEntry {
+  id: string;
+  date: string; // ISO yyyy-mm-dd
+  winner: string;
+  loser: string;
+  /** Winner's points first, e.g. "33-31" */
+  score: string;
+}
+
 export interface Tournament {
   id: string;
   /** Label carried by this tournament's matches, e.g. "Christmas 2024" */

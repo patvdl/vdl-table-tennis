@@ -15,6 +15,7 @@ import type {
   Match,
   PlayerProfile,
   PlayerStats,
+  SetRecordEntry,
   Tournament,
 } from "../types";
 
@@ -39,6 +40,8 @@ interface MatchesState {
   avatars: Map<string, string>;
   /** Soft-deleted players still inside their 30-day restore window */
   trash: DeletedPlayer[];
+  /** Admin-entered single-set scorelines (deuce marathons) */
+  sets: SetRecordEntry[];
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
   addPlayer(name: string): Promise<void>;
   renamePlayer(oldName: string, newName: string): Promise<void>;
@@ -51,6 +54,8 @@ interface MatchesState {
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
   setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
   removeTournament(id: string): Promise<void>;
+  addSetRecord(s: Omit<SetRecordEntry, "id">): Promise<void>;
+  removeSetRecord(id: string): Promise<void>;
   refresh(): Promise<void>;
 }
 
@@ -61,6 +66,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
   const [tournamentRows, setTournamentRows] = useState<Tournament[]>([]);
   const [playerRows, setPlayerRows] = useState<PlayerProfile[]>([]);
   const [trash, setTrash] = useState<DeletedPlayer[]>([]);
+  const [sets, setSets] = useState<SetRecordEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +91,12 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
       } catch {
         // Trash is non-critical (and hidden from non-admins anyway)
         setTrash([]);
+      }
+      try {
+        setSets(await store.loadSets());
+      } catch {
+        // Set records are non-critical; the record card just shows empty
+        setSets([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -150,6 +162,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     tournaments,
     avatars,
     trash,
+    sets,
     async setPlayerAvatar(name, avatar) {
       await store.setPlayerAvatar(name, avatar);
       await refresh();
@@ -196,6 +209,14 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     },
     async removeTournament(id) {
       await store.removeTournament(id);
+      await refresh();
+    },
+    async addSetRecord(s) {
+      await store.addSet(s);
+      await refresh();
+    },
+    async removeSetRecord(id) {
+      await store.removeSet(id);
       await refresh();
     },
     refresh,

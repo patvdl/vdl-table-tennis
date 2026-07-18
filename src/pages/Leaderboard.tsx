@@ -279,23 +279,22 @@ export default function Leaderboard() {
       >
         <div>
           <label className="field">Season</label>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {seasonYears.map((y) => {
-              const target = seasonDate(y);
-              const active = (asOf || "") === target;
-              return (
-                <button
-                  key={y}
-                  className={`btn ${active ? "" : "ghost"}`}
-                  style={{ padding: "6px 14px", fontSize: 13 }}
-                  title={target ? `Year-end standings, ${formatDate(target)}` : "Live standings"}
-                  onClick={() => setAsOf(target)}
-                >
-                  {y}
-                </button>
-              );
-            })}
-          </div>
+          <select
+            style={{ width: "auto" }}
+            value={String(seasonYears.find((y) => (asOf || "") === seasonDate(y)) ?? "custom")}
+            onChange={(e) => setAsOf(seasonDate(Number(e.target.value)))}
+          >
+            {!seasonYears.some((y) => (asOf || "") === seasonDate(y)) && (
+              <option value="custom" disabled>
+                Custom date
+              </option>
+            )}
+            {[...seasonYears].reverse().map((y) => (
+              <option key={y} value={y}>
+                {seasonDate(y) === "" ? `${y} — current` : `${y} — year-end`}
+              </option>
+            ))}
+          </select>
         </div>
         <div style={{ maxWidth: 220 }}>
           <label className="field">View rankings on date</label>

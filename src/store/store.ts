@@ -1,5 +1,11 @@
 import { supabase } from "../lib/supabase";
-import type { DeletedPlayer, Match, PlayerProfile, Tournament } from "../types";
+import type {
+  DeletedPlayer,
+  Match,
+  PlayerProfile,
+  SetRecordEntry,
+  Tournament,
+} from "../types";
 import seedRaw from "../data/seed-matches.json";
 
 export type StoreMode = "supabase" | "local";
@@ -46,6 +52,10 @@ export interface DataStore {
   restorePlayer(name: string): Promise<void>;
   /** Permanently discard a soft-deleted player's data right now */
   purgeDeletedPlayer(name: string): Promise<void>;
+  /** Admin-entered single-set scorelines for the "Longest set played" record */
+  loadSets(): Promise<SetRecordEntry[]>;
+  addSet(s: Omit<SetRecordEntry, "id">): Promise<void>;
+  removeSet(id: string): Promise<void>;
 }
 
 /** How long deleted players can be restored before their data is gone for good */
@@ -71,6 +81,7 @@ const LOCAL_KEY = "vdl-tt-matches-v2";
 const LOCAL_T_KEY = "vdl-tt-tournaments-v1";
 const LOCAL_P_KEY = "vdl-tt-avatars-v1";
 const LOCAL_D_KEY = "vdl-tt-trash-v1";
+const LOCAL_S_KEY = "vdl-tt-sets-v1";
 
 /** Full snapshot of a deleted player, enough to restore them completely */
 interface TrashEntry {
@@ -272,6 +283,23 @@ const localStore: DataStore = {
   async purgeDeletedPlayer(name) {
     writeTrash(readTrash().filter((t) => t.name !== name));
   },
+  async loadSets() {
+    try {
+      const raw = localStorage.getItem(LOCAL_S_KEY);
+      return raw ? (JSON.parse(raw) as SetRecordEntry[]) : [];
+    } catch {
+      return [];
+    }
+  },
+  async addSet(s) {
+    const all = await this.loadSets();
+    all.push({ ...s, id: crypto.randomUUID() });
+    localStorage.setItem(LOCAL_S_KEY, JSON.stringify(all));
+  },
+  async removeSet(id) {
+    const all = (await this.loadSets()).filter((s) => s.id !== id);
+    localStorage.setItem(LOCAL_S_KEY, JSON.stringify(all));
+  },
 };
 
 function makeSupabaseStore(): DataStore {
@@ -466,6 +494,33 @@ function makeSupabaseStore(): DataStore {
     },
     async purgeDeletedPlayer(name) {
       const { error } = await sb.from("deleted_players").delete().eq("name", name);
+      if (error) throw new Error(error.message);
+    },
+    async loadSets() {
+      const { data, error } = await sb
+        .from("set_records")
+        .select("*")
+        .order("date", { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => ({
+        id: String(r.id),
+        date: String(r.date),
+        winner: String(r.winner),
+        loser: String(r.loser),
+        score: String(r.score),
+      }));
+    },
+    async addSet(s) {
+      const { error } = await sb.from("set_records").insert({
+        date: s.date,
+        winner: s.winner,
+        loser: s.loser,
+        score: s.score,
+      });
+      if (error) throw new Error(error.message);
+    },
+    async removeSet(id) {
+      const { error } = await sb.from("set_records").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
   };
