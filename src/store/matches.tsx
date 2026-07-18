@@ -50,6 +50,8 @@ interface MatchesState {
   purgeDeletedPlayer(name: string): Promise<void>;
   addMatch(m: NewMatch): Promise<void>;
   removeMatch(id: string): Promise<void>;
+  /** Re-slot a match in the log (after `afterId`, null = first); ratings recompute */
+  moveMatch(id: string, afterId: string | null): Promise<void>;
   addTournament(name: string, date: string): Promise<void>;
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
   setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
@@ -193,6 +195,10 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     },
     async removeMatch(id) {
       await store.remove(id);
+      await refresh();
+    },
+    async moveMatch(id, afterId) {
+      await store.moveMatch(id, afterId);
       await refresh();
     },
     async addTournament(name, date) {

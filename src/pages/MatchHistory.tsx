@@ -3,17 +3,19 @@ import { Link } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { formatDate, round0 } from "../lib/format";
+import type { EnrichedMatch } from "../types";
 import Delta from "../components/Delta";
 import PlayerName from "../components/PlayerName";
 
 const PAGE = 50;
 
 export default function MatchHistory() {
-  const { replayResult, playerNames, removeMatch } = useMatches();
+  const { replayResult, playerNames, removeMatch, moveMatch } = useMatches();
   const { role } = useAuth();
   const [filter, setFilter] = useState("");
   const [shown, setShown] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
+  const [moving, setMoving] = useState<EnrichedMatch | null>(null);
 
   const rows = useMemo(() => {
     const all = [...replayResult.enriched].reverse(); // newest first
@@ -113,7 +115,15 @@ export default function MatchHistory() {
                   <td className="num rating">{round0(winnerAfter)}</td>
                   <td className="num rating">{round0(loserAfter)}</td>
                   {role === "admin" && (
-                    <td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button
+                        className="btn ghost"
+                        style={{ marginRight: 8 }}
+                        disabled={busy === m.id}
+                        onClick={() => setMoving(m)}
+                      >
+                        Move
+                      </button>
                       <button
                         className="btn danger"
                         disabled={busy === m.id}
@@ -137,6 +147,93 @@ export default function MatchHistory() {
           </button>
         </div>
       )}
+
+      {moving && (
+        <MoveMatchModal
+          match={moving}
+          all={replayResult.enriched}
+          onClose={() => setMoving(null)}
+          onMove={moveMatch}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Re-slot a match in the log. Defaults to the position its date implies —
+ * right after the last match played on or before that day — which is
+ * exactly where a backfilled match usually belongs.
+ */
+function MoveMatchModal({
+  match,
+  all,
+  onClose,
+  onMove,
+}: {
+  match: EnrichedMatch;
+  all: EnrichedMatch[]; // chronological (seq order)
+  onClose: () => void;
+  onMove: (id: string, afterId: string | null) => Promise<void>;
+}) {
+  const others = useMemo(() => all.filter((m) => m.id !== match.id), [all, match]);
+  const currentAfter = useMemo(() => {
+    const idx = all.findIndex((m) => m.id === match.id);
+    return idx > 0 ? all[idx - 1].id : "";
+  }, [all, match]);
+  const [afterId, setAfterId] = useState<string>(() => {
+    const candidates = others.filter((m) => m.date <= match.date);
+    return candidates.length > 0 ? candidates[candidates.length - 1].id : "";
+  });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onMove(match.id, afterId || null);
+      onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Move match</h2>
+        <p className="sub">
+          #{match.seq} · {formatDate(match.date)} — <strong>{match.winnerName}</strong> def.{" "}
+          <strong>{match.loserName}</strong>
+        </p>
+        <p className="sub">
+          Ratings replay the log in this order, so slotting a match where it was
+          actually played recalculates everything after it. The suggested spot
+          matches this match's date.
+        </p>
+        <label className="field">Place directly after</label>
+        <select value={afterId} onChange={(e) => setAfterId(e.target.value)}>
+          <option value="">— start of the log —</option>
+          {others.map((m) => (
+            <option key={m.id} value={m.id}>
+              #{m.seq} · {formatDate(m.date)} — {m.winnerName} def. {m.loserName}
+              {m.id === currentAfter ? " (current spot)" : ""}
+            </option>
+          ))}
+        </select>
+        <div style={{ marginTop: 18, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button className="btn ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button
+            className="btn"
+            onClick={save}
+            disabled={saving || afterId === currentAfter}
+          >
+            {saving ? "Moving…" : "Move match"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

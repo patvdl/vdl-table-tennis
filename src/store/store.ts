@@ -29,6 +29,12 @@ export interface DataStore {
   load(): Promise<Match[]>;
   add(m: NewMatch): Promise<void>;
   remove(id: string): Promise<void>;
+  /**
+   * Re-slot a match in the log: place it immediately after `afterId`
+   * (null = the very start). Ratings replay in log order, so this is how a
+   * forgotten match gets inserted where it was actually played.
+   */
+  moveMatch(id: string, afterId: string | null): Promise<void>;
   loadTournaments(): Promise<Tournament[]>;
   addTournament(name: string, date: string): Promise<void>;
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
@@ -75,6 +81,35 @@ function seedMatches(): Match[] {
     score: row[4] ?? null,
     tournament: row[5] ?? null,
   }));
+}
+
+/**
+ * Seq reassignments needed to move a match immediately after `afterId`
+ * (null = to the front). The set of seq values stays the same — they just
+ * rotate across the affected rows — so only the rows between the old and
+ * new position are touched.
+ */
+function planMove(
+  all: Match[],
+  id: string,
+  afterId: string | null,
+): { id: string; seq: number }[] {
+  const ordered = [...all].sort((a, b) => a.seq - b.seq);
+  const slots = ordered.map((m) => m.seq);
+  const from = ordered.findIndex((m) => m.id === id);
+  if (from < 0) throw new Error("Match not found.");
+  const [moved] = ordered.splice(from, 1);
+  let to = 0;
+  if (afterId !== null) {
+    const anchor = ordered.findIndex((m) => m.id === afterId);
+    if (anchor < 0) throw new Error("Target match not found.");
+    to = anchor + 1;
+  }
+  ordered.splice(to, 0, moved);
+  const current = new Map(all.map((m) => [m.id, m.seq]));
+  return ordered
+    .map((m, k) => ({ id: m.id, seq: slots[k] }))
+    .filter((c) => current.get(c.id) !== c.seq);
 }
 
 const LOCAL_KEY = "vdl-tt-matches-v2";
@@ -128,6 +163,16 @@ const localStore: DataStore = {
   async remove(id) {
     const all = (await this.load()).filter((m) => m.id !== id);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+  },
+  async moveMatch(id, afterId) {
+    const all = await this.load();
+    const changes = planMove(all, id, afterId);
+    if (changes.length === 0) return;
+    const newSeq = new Map(changes.map((c) => [c.id, c.seq]));
+    const updated = all
+      .map((m) => (newSeq.has(m.id) ? { ...m, seq: newSeq.get(m.id)! } : m))
+      .sort((a, b) => a.seq - b.seq);
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(updated));
   },
   async loadTournaments() {
     const raw = localStorage.getItem(LOCAL_T_KEY);
@@ -337,6 +382,32 @@ function makeSupabaseStore(): DataStore {
     async remove(id) {
       const { error } = await sb.from("matches").delete().eq("id", id);
       if (error) throw new Error(error.message);
+    },
+    async moveMatch(id, afterId) {
+      const all = await this.load();
+      const changes = planMove(all, id, afterId);
+      if (changes.length === 0) return;
+      const target = changes.find((c) => c.id === id)!;
+      const others = changes.filter((c) => c.id !== id);
+      const oldSeq = all.find((m) => m.id === id)!.seq;
+
+      // seq has a unique index, so free a slot first: park the moved match
+      // beyond the end, shift the in-between rows toward its old slot
+      // (nearest first, so every write lands on a just-freed value), then
+      // drop the moved match into its target.
+      const parkSeq = all.reduce((mx, m) => Math.max(mx, m.seq), 0) + 1;
+      let r = await sb.from("matches").update({ seq: parkSeq }).eq("id", id);
+      if (r.error) throw new Error(r.error.message);
+
+      const movingEarlier = target.seq < oldSeq;
+      others.sort((a, b) => (movingEarlier ? b.seq - a.seq : a.seq - b.seq));
+      for (const c of others) {
+        r = await sb.from("matches").update({ seq: c.seq }).eq("id", c.id);
+        if (r.error) throw new Error(r.error.message);
+      }
+
+      r = await sb.from("matches").update({ seq: target.seq }).eq("id", id);
+      if (r.error) throw new Error(r.error.message);
     },
     async loadTournaments() {
       const { data, error } = await sb
