@@ -206,7 +206,7 @@ export default function Records() {
           <div className="card-head">
             <h2>Player of the Year</h2>
             <select
-              style={{ width: "auto", padding: "6px 32px 6px 12px", fontSize: 13 }}
+              className="select-compact"
               value={season.year}
               onChange={(e) => setSelYear(Number(e.target.value))}
             >
@@ -330,7 +330,7 @@ export default function Records() {
                 </div>
               </div>
 
-              <div className="table-wrap">
+              <div className="table-wrap pin-2">
                 <table>
                   <thead>
                     <tr>

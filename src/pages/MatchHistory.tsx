@@ -56,7 +56,7 @@ export default function MatchHistory() {
         </select>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap pin-2">
         <table>
           <thead>
             <tr>

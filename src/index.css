@@ -238,6 +238,8 @@ th.num {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+  /* pills move to the next line as a unit but never break internally */
+  white-space: nowrap;
 }
 
 .badge.up {
@@ -686,7 +688,8 @@ input[type="checkbox"]:checked::after {
 
 .records-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  /* min(360px, 100%) so columns never demand more than the screen has */
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
   gap: 20px;
   /* cards stretch so each pair lines up, even when one has less content */
   align-items: stretch;
@@ -694,6 +697,22 @@ input[type="checkbox"]:checked::after {
 
 .records-grid > .card + .card {
   margin-top: 0;
+}
+
+/* Grid/flex items default to min-width auto, which lets a wide table push
+   the card (and the whole page) sideways on phones. Zeroing it lets the
+   card shrink so .table-wrap can scroll internally instead. */
+.records-grid > .card,
+.grid-2 > * {
+  min-width: 0;
+}
+
+/* compact inline dropdown used in card headers (e.g. season pickers) */
+select.select-compact {
+  width: auto;
+  max-width: 100%;
+  padding: 6px 32px 6px 12px;
+  font-size: 13px;
 }
 
 .records-span {
@@ -1176,6 +1195,56 @@ input[type="checkbox"]:checked::after {
 
   .record-hero {
     gap: 11px;
+  }
+
+  /* the hero's text block wraps instead of pushing past the card edge */
+  .record-hero > div {
+    min-width: 0;
+  }
+
+  .record-context {
+    overflow-wrap: anywhere;
+  }
+
+  .card-head {
+    flex-wrap: wrap;
+  }
+
+  /* record lists: wrap long date ranges in place of sideways scrolling */
+  .records-grid td {
+    white-space: normal;
+    padding: 8px 5px;
+  }
+
+  .records-grid th {
+    padding: 7px 5px;
+  }
+
+  .records-grid td.num,
+  .records-grid td.rank-cell,
+  .records-grid td .btn {
+    white-space: nowrap;
+  }
+
+  .records-grid .rank-cell {
+    width: 22px;
+    min-width: 22px;
+  }
+
+  .records-grid .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  /* inline styles set the desktop size, hence the important */
+  .records-grid td .btn.ghost {
+    padding: 2px 7px !important;
+    font-size: 10px !important;
+  }
+
+  /* 16px stops iOS zooming into compact selects too */
+  select.select-compact {
+    font-size: 16px;
   }
 
   .podium-tile {

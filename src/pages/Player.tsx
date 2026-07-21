@@ -274,7 +274,7 @@ export default function PlayerPage() {
             ? `All ${myMatches.length} of ${player}'s matches, newest first.`
             : `${player}'s last ${RECENT} matches.`}
         </p>
-        <div className="table-wrap">
+        <div className="table-wrap pin-1">
           <table>
             <thead>
               <tr>
