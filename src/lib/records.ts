@@ -66,13 +66,6 @@ export interface RatingExtreme {
   date: string;
 }
 
-/** Career tally of wins by a specific set scoreline (3-0 sweeps, 3-2 deciders) */
-export interface SetScoreRecord {
-  player: string;
-  count: number;
-  latest: string;
-}
-
 export interface ReignRecord {
   player: string;
   /** Total full days spent at #1 across all reigns */
@@ -131,28 +124,7 @@ export interface RecordBook {
   reigns: ReignRecord[]; // most days at #1 first
   topFive: TopFiveRecord[]; // most days ranked in the top 5 first
   giantKillers: GiantKillerRecord[]; // most wins over reigning #1s first
-  sweeps: SetScoreRecord[]; // most 3-0 wins first
-  deciders: SetScoreRecord[]; // most 3-2 wins first
   seasons: SeasonAward[]; // player of the year, oldest year first
-}
-
-/**
- * Reads a best-of-5 set scoreline out of a recorded score, winner first.
- * Returns "3-0" | "3-1" | "3-2", or null for point scores ("21-15"),
- * missing scores, or anything else.
- */
-export function parseSetScore(score: string | null): string | null {
-  if (!score) return null;
-  const m = score
-    .trim()
-    .toLowerCase()
-    .replace(/\s*sets?$/, "")
-    .replace(/\s+/g, "")
-    .match(/^(\d+)[-–](\d+)$/);
-  if (!m) return null;
-  const a = Number(m[1]);
-  const b = Number(m[2]);
-  return a === 3 && b >= 0 && b <= 2 ? `3-${b}` : null;
 }
 
 function pairKey(a: string, b: string): string {
@@ -551,8 +523,6 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const lowest = new Map<string, RatingExtreme>();
   const pairWinners = new Map<string, string[]>(); // chronological winner names
   const upsets: UpsetRecord[] = [];
-  const sweeps = new Map<string, SetScoreRecord>(); // 3-0 wins
-  const deciders = new Map<string, SetScoreRecord>(); // 3-2 wins
 
   const ordered = [...enriched].sort((a, b) => a.seq - b.seq);
 
@@ -593,16 +563,6 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
 
     winners.push(m.winnerName);
     pairWinners.set(key, winners);
-
-    // Set-scoreline tallies — only matches recorded with a sets score count
-    const setScore = parseSetScore(m.score);
-    if (setScore === "3-0" || setScore === "3-2") {
-      const map = setScore === "3-0" ? sweeps : deciders;
-      const rec = map.get(m.winnerName) ?? { player: m.winnerName, count: 0, latest: m.date };
-      rec.count++;
-      rec.latest = m.date;
-      map.set(m.winnerName, rec);
-    }
 
     // Streak runs — every run is recorded individually when it ends, so
     // one player can hold several spots in the top-5 lists.
@@ -704,12 +664,6 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
     reigns,
     topFive,
     giantKillers,
-    sweeps: [...sweeps.values()].sort(
-      (a, b) => b.count - a.count || a.latest.localeCompare(b.latest),
-    ),
-    deciders: [...deciders.values()].sort(
-      (a, b) => b.count - a.count || a.latest.localeCompare(b.latest),
-    ),
     seasons: seasonsFor(enriched),
   };
 }
