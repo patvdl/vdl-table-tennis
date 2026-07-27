@@ -139,8 +139,10 @@ export default function Records() {
     }
   };
 
-  const [uniqueWins, setUniqueWins] = useState(false);
-  const [uniqueLosses, setUniqueLosses] = useState(false);
+  // Best-per-player reads better as the default — otherwise one dominant
+  // player's runs can fill the whole top 5.
+  const [uniqueWins, setUniqueWins] = useState(true);
+  const [uniqueLosses, setUniqueLosses] = useState(true);
   const [expandedKiller, setExpandedKiller] = useState<string | null>(null);
   const [expandedReign, setExpandedReign] = useState<string | null>(null);
   const [expandedTopFive, setExpandedTopFive] = useState<string | null>(null);
