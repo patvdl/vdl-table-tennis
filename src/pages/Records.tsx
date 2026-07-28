@@ -150,6 +150,9 @@ export default function Records() {
   const [expandedLossRun, setExpandedLossRun] = useState<number | null>(null);
   const [selYear, setSelYear] = useState<number | null>(null);
   const [potyOpen, setPotyOpen] = useState(false);
+  /** Player whose season is spotlighted in the PoTY hero (null = the winner) */
+  const [potySpotlight, setPotySpotlight] = useState<string | null>(null);
+  const [potyAll, setPotyAll] = useState(false);
   const [moreCards, setMoreCards] = useState<Record<string, boolean>>({});
 
   const shown = (key: string) => (moreCards[key] ? MAX_N : TOP_N);
@@ -170,13 +173,34 @@ export default function Records() {
   const [searchParams] = useSearchParams();
   const urlYear = searchParams.get("year");
   useEffect(() => {
-    if (urlYear) setSelYear(Number(urlYear));
+    if (urlYear) {
+      setSelYear(Number(urlYear));
+      setPotySpotlight(null);
+    }
   }, [urlYear]);
 
   const seasons = records.seasons;
   const season =
     seasons.find((s) => s.year === selYear) ?? seasons[seasons.length - 1] ?? null;
   const poty = season?.winner ?? null;
+
+  // "View season" swaps the hero (and stat tiles) to any player in the list
+  const spotlightStats =
+    season && potySpotlight
+      ? ([...season.standings, ...season.unranked].find((s) => s.player === potySpotlight) ??
+        null)
+      : null;
+  const featured = spotlightStats ?? poty;
+  const featuredRank =
+    season && featured
+      ? season.standings.findIndex((s) => s.player === featured.player) + 1
+      : 0; // 0 = played but never rated that year
+  const featuredIsWinner = featured !== null && poty !== null && featured.player === poty.player;
+  const potyRows = season
+    ? potyAll
+      ? [...season.standings, ...season.unranked]
+      : season.standings.slice(0, 10)
+    : [];
 
   const winList = uniqueWins ? bestPerPlayer(records.winStreaks) : records.winStreaks;
   const lossList = uniqueLosses ? bestPerPlayer(records.lossStreaks) : records.lossStreaks;
@@ -210,7 +234,11 @@ export default function Records() {
             <select
               className="select-compact"
               value={season.year}
-              onChange={(e) => setSelYear(Number(e.target.value))}
+              onChange={(e) => {
+                setSelYear(Number(e.target.value));
+                setPotySpotlight(null);
+                setPotyAll(false);
+              }}
             >
               {[...seasons].reverse().map((s) => (
                 <option key={s.year} value={s.year}>
@@ -231,44 +259,75 @@ export default function Records() {
             </p>
           )}
 
-          {poty && (
+          {featured && (
             <>
               <div className="record-hero" style={{ marginTop: potyOpen ? 0 : 12 }}>
                 <div style={{ position: "relative" }}>
-                  <Avatar player={poty.player} size={96} />
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -15,
-                      left: -7,
-                      transform: "rotate(-24deg)",
-                      lineHeight: 0,
-                    }}
-                    aria-hidden
-                  >
-                    <Crown size={30} />
-                  </span>
+                  <Avatar player={featured.player} size={96} />
+                  {featuredIsWinner && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: -15,
+                        left: -7,
+                        transform: "rotate(-24deg)",
+                        lineHeight: 0,
+                      }}
+                      aria-hidden
+                    >
+                      <Crown size={30} />
+                    </span>
+                  )}
                 </div>
                 <div>
                   <div className="record-context">
-                    🏆 Player of the Year {season.year}
-                    {season.inProgress && " · so far"}
+                    {featuredIsWinner ? (
+                      <>
+                        🏆 Player of the Year {season.year}
+                        {season.inProgress && " · so far"}
+                      </>
+                    ) : featuredRank > 0 ? (
+                      <>
+                        {season.year} season · #{featuredRank} in the race
+                      </>
+                    ) : (
+                      <>{season.year} season · unrated</>
+                    )}
                   </div>
                   <div className="record-value" style={{ fontSize: 30 }}>
-                    <PlayerLink name={poty.player} />
+                    <PlayerLink name={featured.player} />
                   </div>
-                  <div className="record-context">season score {poty.score} / 100</div>
+                  <div className="record-context">
+                    {featuredRank > 0
+                      ? `season score ${featured.score} / 100`
+                      : "not rated that season — no score"}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginTop: 4 }}>
+              <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
                   className="btn ghost"
                   style={{ padding: "4px 16px", fontSize: 12 }}
-                  onClick={() => setPotyOpen((v) => !v)}
+                  onClick={() => {
+                    if (potyOpen) {
+                      setPotySpotlight(null);
+                      setPotyAll(false);
+                    }
+                    setPotyOpen((v) => !v);
+                  }}
                 >
                   {potyOpen ? "See less" : "See more"}
                 </button>
+                {spotlightStats && !featuredIsWinner && (
+                  <button
+                    className="btn ghost"
+                    style={{ padding: "4px 16px", fontSize: 12 }}
+                    onClick={() => setPotySpotlight(null)}
+                  >
+                    Back to the winner
+                  </button>
+                )}
               </div>
 
               {potyOpen && (
@@ -277,36 +336,36 @@ export default function Records() {
                 <div className="stat-tile">
                   <div className="label">Record</div>
                   <div className="value">
-                    <span style={{ color: "var(--green)" }}>{poty.wins}</span>–
-                    <span style={{ color: "var(--red)" }}>{poty.losses}</span>
+                    <span style={{ color: "var(--green)" }}>{featured.wins}</span>–
+                    <span style={{ color: "var(--red)" }}>{featured.losses}</span>
                   </div>
-                  <div className="hint">{pct(poty.winPct)} win rate</div>
+                  <div className="hint">{pct(featured.winPct)} win rate</div>
                 </div>
                 <div className="stat-tile">
                   <div className="label">Days at #1</div>
-                  <div className="value">{poty.daysAtNo1}</div>
+                  <div className="value">{featured.daysAtNo1}</div>
                   <div className="hint">during {season.year}</div>
                 </div>
                 <div className="stat-tile">
                   <div className="label">Days in top 5</div>
-                  <div className="value">{poty.daysTop5}</div>
+                  <div className="value">{featured.daysTop5}</div>
                   <div className="hint">during {season.year}</div>
                 </div>
                 <div className="stat-tile">
                   <div className="label">Top-5 wins</div>
-                  <div className="value">{poty.topFiveWins}</div>
+                  <div className="value">{featured.topFiveWins}</div>
                   <div className="hint">
-                    {poty.no1Wins} of {poty.no1Played} over the #1
+                    {featured.no1Wins} of {featured.no1Played} over the #1
                   </div>
                 </div>
                 <div className="stat-tile">
                   <div className="label">Best win</div>
-                  {poty.bestWin ? (
+                  {featured.bestWin ? (
                     <>
-                      <div className="value">#{poty.bestWin.opponentRank}</div>
+                      <div className="value">#{featured.bestWin.opponentRank}</div>
                       <div className="hint">
-                        beat <PlayerName name={poty.bestWin.opponent} /> ·{" "}
-                        {formatDate(poty.bestWin.date)}
+                        beat <PlayerName name={featured.bestWin.opponent} /> ·{" "}
+                        {formatDate(featured.bestWin.date)}
                       </div>
                     </>
                   ) : (
@@ -319,15 +378,19 @@ export default function Records() {
                 <div className="stat-tile">
                   <div className="label">Peak rating</div>
                   <div className="value">
-                    {poty.peakRating !== null ? round0(poty.peakRating) : "—"}
+                    {featured.peakRating !== null ? round0(featured.peakRating) : "—"}
                   </div>
                   <div className="hint">highest during {season.year}</div>
                 </div>
                 <div className="stat-tile">
                   <div className="label">{season.inProgress ? "Current rank" : "Year-end rank"}</div>
-                  <div className="value">{poty.endRank !== null ? `#${poty.endRank}` : "—"}</div>
+                  <div className="value">
+                    {featured.endRank !== null ? `#${featured.endRank}` : "—"}
+                  </div>
                   <div className="hint">
-                    {poty.endRating !== null ? `rating ${round0(poty.endRating)}` : "unranked"}
+                    {featured.endRating !== null
+                      ? `rating ${round0(featured.endRating)}`
+                      : "unranked"}
                   </div>
                 </div>
               </div>
@@ -343,29 +406,61 @@ export default function Records() {
                       <th className="num">Top-5 wins</th>
                       <th className="num">Days at #1</th>
                       <th className="num">Score</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {season.standings.slice(0, 10).map((s, i) => (
-                      <tr key={s.player}>
-                        <td className="rank-cell">{i + 1}</td>
-                        <td>
-                          <PlayerLink name={s.player} />
-                        </td>
-                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                          {s.wins}–{s.losses}
-                        </td>
-                        <td className="num">{pct(s.winPct)}</td>
-                        <td className="num">{s.topFiveWins}</td>
-                        <td className="num">{s.daysAtNo1}</td>
-                        <td className="num" style={{ fontFamily: "var(--mono)" }}>
-                          {s.score}
-                        </td>
-                      </tr>
-                    ))}
+                    {potyRows.map((s, i) => {
+                      const isRanked = i < season.standings.length;
+                      const isSpotlit = featured.player === s.player;
+                      return (
+                        <tr
+                          key={s.player}
+                          style={isSpotlit ? { background: "rgba(255, 255, 255, 0.04)" } : undefined}
+                        >
+                          <td className="rank-cell">{isRanked ? i + 1 : "—"}</td>
+                          <td>
+                            <PlayerLink name={s.player} />
+                          </td>
+                          <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                            {s.wins}–{s.losses}
+                          </td>
+                          <td className="num">{pct(s.winPct)}</td>
+                          <td className="num">{s.topFiveWins}</td>
+                          <td className="num">{s.daysAtNo1}</td>
+                          <td className="num" style={{ fontFamily: "var(--mono)" }}>
+                            {isRanked ? s.score : "—"}
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <button
+                              className="btn ghost"
+                              style={{ padding: "2px 10px", fontSize: 11 }}
+                              onClick={() =>
+                                setPotySpotlight(potySpotlight === s.player ? null : s.player)
+                              }
+                            >
+                              {isSpotlit ? "Viewing" : "View season"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+              {(season.standings.length > 10 || season.unranked.length > 0) && (
+                <div style={{ marginTop: 10, textAlign: "center" }}>
+                  <button
+                    className="btn ghost"
+                    style={{ padding: "4px 16px", fontSize: 12 }}
+                    onClick={() => setPotyAll((v) => !v)}
+                  >
+                    {potyAll
+                      ? "See top 10"
+                      : `See all (${season.standings.length + season.unranked.length} players)`}
+                  </button>
+                </div>
+              )}
               </>
               )}
             </>

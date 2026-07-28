@@ -111,8 +111,10 @@ export interface SeasonAward {
   /** True for the current calendar year — the race is still open */
   inProgress: boolean;
   winner: SeasonStats | null;
-  /** Everyone who played that year, best season first */
+  /** Every rated player who played that year, best season first */
   standings: SeasonStats[];
+  /** Players who played that year but were never rated — outside the race */
+  unranked: SeasonStats[];
 }
 
 export interface RecordBook {
@@ -523,7 +525,11 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
     );
     const winner = standings[0] ?? null;
 
-    return { year, inProgress: year === currentYear, winner, standings };
+    const unranked = list
+      .filter((s) => s.bestRank === null)
+      .sort((a, b) => b.wins - a.wins || b.winPct - a.winPct || a.player.localeCompare(b.player));
+
+    return { year, inProgress: year === currentYear, winner, standings, unranked };
   });
 }
 
