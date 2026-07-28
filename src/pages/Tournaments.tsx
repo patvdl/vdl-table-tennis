@@ -3,6 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMatches, type TournamentSummary } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { formatDate } from "../lib/format";
+import { predictMatch } from "../lib/elo";
+import { roundLabel, type TournamentAnalysis } from "../lib/bracket";
+import { pendingContests, simulateTournament } from "../lib/simulate";
 import Bracket, { PlannedBracket } from "../components/Bracket";
 import Avatar from "../components/Avatar";
 import PlayerName from "../components/PlayerName";
@@ -41,6 +44,143 @@ function Podium({ t }: { t: TournamentSummary }) {
             </div>
           </div>
         ))}
+    </div>
+  );
+}
+
+function fmtPct(p: number): string {
+  if (p <= 0) return "—";
+  if (p < 0.005) return "<1%";
+  if (p > 0.995 && p < 1) return ">99%";
+  return `${Math.round(p * 100)}%`;
+}
+
+function PredictionsCard({ analysis }: { analysis: TournamentAnalysis }) {
+  const { replayResult } = useMatches();
+  const { enriched, stats } = replayResult;
+
+  const pending = useMemo(() => {
+    const contests = pendingContests(analysis.planned).map((c) => ({
+      round: roundLabel(c.depth, analysis.maxDepth),
+      ...c,
+    }));
+    if (analysis.thirdPlacePending) {
+      contests.push({
+        round: "3rd place",
+        a: analysis.thirdPlacePending[0],
+        b: analysis.thirdPlacePending[1],
+        depth: -1,
+      });
+    }
+    return contests.map((c) => ({
+      ...c,
+      pred: predictMatch(enriched, stats, c.a, c.b),
+    }));
+  }, [analysis, enriched, stats]);
+
+  const outcomes = useMemo(() => {
+    if (!analysis.planned) return [];
+    return simulateTournament(
+      analysis.planned,
+      analysis.thirdPlaceMatch,
+      analysis.players,
+      enriched,
+      stats,
+    ).filter((o) => o.title > 0 || o.final > 0 || o.podium > 0);
+  }, [analysis, enriched, stats]);
+
+  if (pending.length === 0 && outcomes.length === 0) return null;
+
+  return (
+    <div className="card">
+      <h2>Crystal ball</h2>
+      <p className="sub">
+        What the win predictor expects from here — every remaining match is played out 5,000
+        times using today's ratings, form and head-to-head records. Updates live as results
+        come in.
+      </p>
+
+      {pending.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Round</th>
+                <th>Match</th>
+                <th>Call</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map((c) => {
+                const favA = c.pred.pA >= 0.5;
+                const fav = favA ? c.a : c.b;
+                const sets = favA
+                  ? `${c.pred.sets.a}–${c.pred.sets.b}`
+                  : `${c.pred.sets.b}–${c.pred.sets.a}`;
+                return (
+                  <tr key={`${c.round}|${c.a}|${c.b}`}>
+                    <td style={{ color: "var(--text-dim)" }}>{c.round}</td>
+                    <td>
+                      <span style={{ fontWeight: favA ? 700 : 400 }}>
+                        <PlayerName name={c.a} />
+                      </span>{" "}
+                      <span className="num" style={{ color: "var(--text-dim)", fontSize: 12 }}>
+                        {fmtPct(c.pred.pA)}
+                      </span>
+                      <span style={{ color: "var(--text-dim)" }}> vs </span>
+                      <span style={{ fontWeight: favA ? 400 : 700 }}>
+                        <PlayerName name={c.b} />
+                      </span>{" "}
+                      <span className="num" style={{ color: "var(--text-dim)", fontSize: 12 }}>
+                        {fmtPct(1 - c.pred.pA)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge neutral">
+                        {fav} {sets}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {outcomes.length > 0 && (
+        <div className="table-wrap" style={{ marginTop: pending.length > 0 ? 16 : 0 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th className="num">Wins it</th>
+                <th className="num">Makes final</th>
+                <th className="num">Podium</th>
+              </tr>
+            </thead>
+            <tbody>
+              {outcomes.map((o) => (
+                <tr key={o.player}>
+                  <td>
+                    <Link
+                      className="player-link"
+                      to={`/player/${encodeURIComponent(o.player)}`}
+                    >
+                      <PlayerName name={o.player} />
+                    </Link>
+                  </td>
+                  <td className="num" style={{ fontWeight: o.title >= 0.5 ? 700 : 400 }}>
+                    {fmtPct(o.title)}
+                  </td>
+                  <td className="num">{fmtPct(o.final)}</td>
+                  <td className="num">{fmtPct(o.podium)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -437,6 +577,10 @@ export default function Tournaments() {
             </div>
           )}
         </div>
+      )}
+
+      {selected && a && selected.status === "active" && a.planned && !a.champion && (
+        <PredictionsCard key={selected.id} analysis={a} />
       )}
 
       {selected && a && a.matches.length > 0 && (

@@ -5,8 +5,9 @@ import { useAuth } from "../store/auth";
 import { TRASH_DAYS } from "../store/store";
 import { RATED_MIN, replay, leaderboard, unratedPlayers } from "../lib/elo";
 import { formatDate, round0, pct } from "../lib/format";
-import type { PlayerStats } from "../types";
+import type { EnrichedMatch, PlayerStats } from "../types";
 import Sparkline from "../components/Sparkline";
+import RaceChart from "../components/RaceChart";
 import StreakBadge from "../components/StreakBadge";
 import Trophy from "../components/Trophy";
 import PlayerActions from "../components/PlayerActions";
@@ -179,6 +180,39 @@ export default function Leaderboard() {
   }, [asOf, today, matches, board, unratedBoard]);
 
   const timeTravelling = Boolean(asOf) && asOf < today;
+
+  // Matches played on today's month-day in earlier years, newest year first
+  const onThisDay = useMemo(() => {
+    const md = today.slice(5);
+    const curYear = today.slice(0, 4);
+    const byYear = new Map<string, EnrichedMatch[]>();
+    for (const m of replayResult.enriched) {
+      if (m.date.slice(5) !== md || m.date.slice(0, 4) === curYear) continue;
+      const y = m.date.slice(0, 4);
+      const list = byYear.get(y);
+      if (list) list.push(m);
+      else byYear.set(y, [m]);
+    }
+    return [...byYear.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([year, ms]) => {
+        // Pick the day's headline: a tournament match if there was one
+        // (the last is the biggest — finals are recorded last), otherwise
+        // the match with the largest rating swing.
+        const tMatches = ms.filter((m) => m.tournament);
+        const highlight = tMatches.length
+          ? tMatches[tMatches.length - 1]
+          : ms.reduce((best, m) =>
+              Math.abs(m.delta) > Math.abs(best.delta) ? m : best,
+            );
+        return { year, count: ms.length, highlight };
+      });
+  }, [replayResult, today]);
+
+  const todayLabel = new Date(`${today}T00:00:00`).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+  });
 
   // Rank is always rating-based, regardless of the active sort
   const ratingRank = useMemo(() => {
@@ -386,6 +420,54 @@ export default function Leaderboard() {
       </div>
       )}
     </div>
+
+    {onThisDay.length > 0 && (
+      <div className="card">
+        <h2>On this day</h2>
+        <p className="sub">{todayLabel} in VDL history.</p>
+        {onThisDay.map(({ year, count, highlight: h }) => (
+          <p key={year} style={{ margin: "8px 0", fontSize: 14 }}>
+            <b>{year}</b>
+            {" — "}
+            <Link
+              className="player-link"
+              to={`/player/${encodeURIComponent(h.winnerName)}`}
+              style={{ color: "var(--green)" }}
+            >
+              <PlayerName name={h.winnerName} />
+            </Link>
+            {" def. "}
+            <Link
+              className="player-link"
+              to={`/player/${encodeURIComponent(h.loserName)}`}
+            >
+              <PlayerName name={h.loserName} />
+            </Link>
+            {h.score ? ` ${h.score}` : ""}
+            {h.tournament && (
+              <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
+                🏆 {h.tournament}
+              </span>
+            )}
+            {count > 1 && (
+              <span style={{ color: "var(--text-dim)" }}>
+                {" "}· one of {count} matches that day
+              </span>
+            )}
+          </p>
+        ))}
+      </div>
+    )}
+
+    {board.length > 1 && (
+      <div className="card">
+        <h2>Rating race</h2>
+        <p className="sub">
+          Every rating journey on one chart — tap a name to add or remove a player.
+        </p>
+        <RaceChart matches={matches} players={board.map((p) => p.name)} />
+      </div>
+    )}
 
     {(view.unratedBoard.length > 0 || pendingPlayers.length > 0) && (
       <div className="card">
