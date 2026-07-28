@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMatches } from "../store/matches";
 import { headToHead, RATED_MIN, START_RATING } from "../lib/elo";
-import { playerStreaks, bestCareerWin } from "../lib/records";
-import type { StreakRecord } from "../lib/records";
+import { playerStreaks, bestCareerWin, standingsFor } from "../lib/records";
+import type { RankSpan, StreakRecord } from "../lib/records";
 import { formatDate, round0, pct, signed } from "../lib/format";
 import Sparkline from "../components/Sparkline";
 import FormChart from "../components/FormChart";
@@ -36,6 +36,7 @@ export default function PlayerPage() {
   const rank = board.findIndex((p) => p.name === player) + 1;
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [streakModal, setStreakModal] = useState<"win" | "loss" | null>(null);
+  const [spansModal, setSpansModal] = useState<"no1" | "top5" | null>(null);
 
   const streaks = useMemo(
     () => playerStreaks(replayResult.enriched, player),
@@ -45,6 +46,15 @@ export default function PlayerPage() {
     () => bestCareerWin(replayResult.enriched, player),
     [player, replayResult],
   );
+
+  // Time spent at #1 and in the top 5, same numbers as the Records page
+  const standings = useMemo(() => {
+    const { reigns, topFive } = standingsFor(replayResult.enriched);
+    return {
+      no1: reigns.find((r) => r.player === player) ?? null,
+      top5: topFive.find((t) => t.player === player) ?? null,
+    };
+  }, [player, replayResult]);
 
   // Oldest first, for the form chart
   const chronological = useMemo(
@@ -207,6 +217,56 @@ export default function PlayerPage() {
               <>
                 <div className="value">—</div>
                 <div className="hint">not ranked yet</div>
+              </>
+            )}
+          </div>
+          <div className="stat-tile">
+            <div className="label">Days at #1</div>
+            {standings.no1 ? (
+              <>
+                <div className="value">{standings.no1.days}</div>
+                <div className="hint">
+                  {standings.no1.spans.length}{" "}
+                  {standings.no1.spans.length === 1 ? "stint" : "stints"}
+                  {standings.no1.current ? " · currently #1" : ""}
+                </div>
+                <button
+                  className="btn ghost"
+                  style={{ padding: "3px 12px", fontSize: 11, marginTop: 8 }}
+                  onClick={() => setSpansModal("no1")}
+                >
+                  Details
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">never held the top spot</div>
+              </>
+            )}
+          </div>
+          <div className="stat-tile">
+            <div className="label">Days in top 5</div>
+            {standings.top5 ? (
+              <>
+                <div className="value">{standings.top5.days}</div>
+                <div className="hint">
+                  {standings.top5.spans.length}{" "}
+                  {standings.top5.spans.length === 1 ? "stint" : "stints"}
+                  {standings.top5.current ? " · currently in the top 5" : ""}
+                </div>
+                <button
+                  className="btn ghost"
+                  style={{ padding: "3px 12px", fontSize: 11, marginTop: 8 }}
+                  onClick={() => setSpansModal("top5")}
+                >
+                  Details
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">never ranked in the top 5</div>
               </>
             )}
           </div>
@@ -437,7 +497,72 @@ export default function PlayerPage() {
           onClose={() => setStreakModal(null)}
         />
       )}
+
+      {spansModal && (
+        <SpansModal
+          title={spansModal === "no1" ? "Days at #1" : "Days in the top 5"}
+          totalDays={(spansModal === "no1" ? standings.no1! : standings.top5!).days}
+          spans={(spansModal === "no1" ? standings.no1! : standings.top5!).spans}
+          onClose={() => setSpansModal(null)}
+        />
+      )}
     </>
+  );
+}
+
+/** Every stint a player spent at #1 (or in the top 5), with dates */
+function SpansModal({
+  title,
+  totalDays,
+  spans,
+  onClose,
+}: {
+  title: string;
+  totalDays: number;
+  spans: RankSpan[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>
+          {title} — {totalDays} {totalDays === 1 ? "day" : "days"}
+        </h2>
+        <p className="sub">
+          {spans.length} {spans.length === 1 ? "stint" : "stints"}, oldest first.
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gap: 5,
+            fontSize: 13,
+            color: "var(--text-dim)",
+            maxHeight: "55vh",
+            overflowY: "auto",
+          }}
+        >
+          {spans.map((s, i) => (
+            <div key={i}>
+              <span className="rank-cell">{i + 1}.</span> {formatDate(s.start)} →{" "}
+              {s.end ? formatDate(s.end) : "present"} ·{" "}
+              <span style={{ color: "var(--text)" }}>
+                {s.days} {s.days === 1 ? "day" : "days"}
+              </span>
+              {!s.end && (
+                <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
+                  ongoing
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 18, textAlign: "right" }}>
+          <button className="btn ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -188,6 +188,23 @@ export function seasonsFor(enriched: EnrichedMatch[]): SeasonAward[] {
   return seasons;
 }
 
+interface StandingsRecords {
+  reigns: ReignRecord[];
+  topFive: TopFiveRecord[];
+  giantKillers: GiantKillerRecord[];
+}
+
+const standingsCache = new WeakMap<EnrichedMatch[], StandingsRecords>();
+/** Cached #1/top-5/giant-killer records, shared by the record book and profiles */
+export function standingsFor(enriched: EnrichedMatch[]): StandingsRecords {
+  let s = standingsCache.get(enriched);
+  if (!s) {
+    s = computeStandingsRecords(enriched, dailyBoardsFor(enriched));
+    standingsCache.set(enriched, s);
+  }
+  return s;
+}
+
 /**
  * Records that depend on the standings over time, derived from the daily
  * boards:
@@ -652,8 +669,7 @@ export function computeRecords(enriched: EnrichedMatch[]): RecordBook {
   const byLengthThenStart = (a: StreakRecord, b: StreakRecord) =>
     b.length - a.length || a.start.localeCompare(b.start);
 
-  const boards = dailyBoardsFor(enriched);
-  const { reigns, topFive, giantKillers } = computeStandingsRecords(enriched, boards);
+  const { reigns, topFive, giantKillers } = standingsFor(enriched);
 
   return {
     winStreaks: winRuns.sort(byLengthThenStart),
