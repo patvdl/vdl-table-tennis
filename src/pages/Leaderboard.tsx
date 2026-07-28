@@ -267,6 +267,69 @@ export default function Leaderboard() {
   return (
     <>
     <div className="card">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h2>Time machine</h2>
+          <p className="sub" style={{ margin: 0 }}>
+            Pick any date and this whole page — rankings, trophies, On this day and the
+            rating race — shows how things stood then.
+          </p>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <label className="field">Season</label>
+            <select
+              style={{ width: "auto" }}
+              value={String(seasonYears.find((y) => (asOf || "") === seasonDate(y)) ?? "custom")}
+              onChange={(e) => setAsOf(seasonDate(Number(e.target.value)))}
+            >
+              {!seasonYears.some((y) => (asOf || "") === seasonDate(y)) && (
+                <option value="custom" disabled>
+                  Custom date
+                </option>
+              )}
+              {[...seasonYears].reverse().map((y) => (
+                <option key={y} value={y}>
+                  {seasonDate(y) === "" ? `${y} — current` : `${y} — year-end`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ maxWidth: 220 }}>
+            <label className="field">View leaderboard on date</label>
+            <input
+              type="date"
+              value={asOf || today}
+              min={firstDate}
+              max={today}
+              onChange={(e) => setAsOf(e.target.value)}
+            />
+          </div>
+          {timeTravelling && (
+            <button className="btn ghost" onClick={() => setAsOf("")}>
+              Back to today
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2>Leaderboard</h2>
@@ -299,51 +362,6 @@ export default function Leaderboard() {
           </button>
         </form>
       )}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 12,
-          flexWrap: "wrap",
-          marginBottom: 16,
-        }}
-      >
-        <div>
-          <label className="field">Season</label>
-          <select
-            style={{ width: "auto" }}
-            value={String(seasonYears.find((y) => (asOf || "") === seasonDate(y)) ?? "custom")}
-            onChange={(e) => setAsOf(seasonDate(Number(e.target.value)))}
-          >
-            {!seasonYears.some((y) => (asOf || "") === seasonDate(y)) && (
-              <option value="custom" disabled>
-                Custom date
-              </option>
-            )}
-            {[...seasonYears].reverse().map((y) => (
-              <option key={y} value={y}>
-                {seasonDate(y) === "" ? `${y} — current` : `${y} — year-end`}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ maxWidth: 220 }}>
-          <label className="field">View leaderboard on date</label>
-          <input
-            type="date"
-            value={asOf || today}
-            min={firstDate}
-            max={today}
-            onChange={(e) => setAsOf(e.target.value)}
-          />
-        </div>
-        {timeTravelling && (
-          <button className="btn ghost" onClick={() => setAsOf("")}>
-            Back to today
-          </button>
-        )}
-      </div>
 
       {view.board.length === 0 ? (
         <p className="sub" style={{ margin: 0 }}>

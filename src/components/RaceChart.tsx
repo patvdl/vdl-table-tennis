@@ -247,6 +247,20 @@ export default function RaceChart({ matches, players }: Props) {
             </polyline>
           ))}
 
+          {/* Invisible fat strokes so hovering anywhere near a line names the player */}
+          {shown.map((s) => (
+            <polyline
+              key={`hit-${s.player}`}
+              points={s.points.map((p) => `${x(p.t).toFixed(1)},${y(p.r).toFixed(1)}`).join(" ")}
+              fill="none"
+              stroke="transparent"
+              strokeWidth="11"
+              pointerEvents="stroke"
+            >
+              <title>{s.player}</title>
+            </polyline>
+          ))}
+
           {shown.map((s) => {
             const last = s.points[s.points.length - 1];
             return (

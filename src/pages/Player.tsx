@@ -53,6 +53,19 @@ export default function PlayerPage() {
   );
   const myMatches = useMemo(() => [...chronological].reverse(), [chronological]); // newest first
 
+  // Career-low rating. Like the record book, only rated moments count —
+  // the swings of the first couple of provisional games don't set records.
+  const lowest = useMemo(() => {
+    let low: { rating: number; date: string } | null = null;
+    for (let i = 0; i < chronological.length; i++) {
+      if (i + 1 < RATED_MIN) continue;
+      const m = chronological[i];
+      const after = m.player1 === player ? m.rating1After : m.rating2After;
+      if (!low || after < low.rating) low = { rating: after, date: m.date };
+    }
+    return low;
+  }, [chronological, player]);
+
   const rivals = useMemo(() => {
     if (!stats) return [];
     const opponents = new Set<string>();
@@ -135,6 +148,20 @@ export default function PlayerPage() {
                     ? `reached ${formatDate(stats.peakDate)}`
                     : `at start rating · since ${formatDate(stats.peakDate)}`}
                 </div>
+              </>
+            ) : (
+              <>
+                <div className="value">—</div>
+                <div className="hint">unrated</div>
+              </>
+            )}
+          </div>
+          <div className="stat-tile">
+            <div className="label">Lowest rating</div>
+            {isRated && lowest ? (
+              <>
+                <div className="value">{round0(lowest.rating)}</div>
+                <div className="hint">reached {formatDate(lowest.date)}</div>
               </>
             ) : (
               <>
