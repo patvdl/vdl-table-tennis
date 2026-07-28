@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMatches, type TournamentSummary } from "../store/matches";
 import { useAuth } from "../store/auth";
+import { TRASH_DAYS } from "../store/store";
 import { formatDate } from "../lib/format";
 import { predictMatch } from "../lib/elo";
 import { roundLabel, type TournamentAnalysis } from "../lib/bracket";
@@ -336,9 +337,14 @@ export default function Tournaments() {
     setTournamentStatus,
     setTournamentBracket,
     removeTournament,
+    tournamentTrash,
+    restoreTournament,
+    purgeDeletedTournament,
   } = useMatches();
   const { role } = useAuth();
   const isAdmin = role === "admin";
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashBusy, setTrashBusy] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
@@ -418,12 +424,47 @@ export default function Tournaments() {
     const q =
       n === 0
         ? `Delete "${t.name}"? (It has no matches, so nothing else is affected.)`
-        : `Delete "${t.name}"? Its ${n} ${n === 1 ? "match stays" : "matches stay"} in the match history and still count for ELO, but the bracket, champion record and trophy are removed. Re-creating a tournament with the exact same name brings them back.`;
+        : `⚠️ Delete "${t.name}" AND its ${n} ${n === 1 ? "match" : "matches"}?\n\nThe ${n === 1 ? "match" : "matches"} will be removed from the match history and every rating will be recalculated without ${n === 1 ? "it" : "them"}.\n\nYou can restore the tournament with all its matches from "Recently deleted" for ${TRASH_DAYS} days — after that it's gone for good.`;
     if (!confirm(q)) return;
     await run(async () => {
       await removeTournament(t.id);
       setSelectedId(null);
+      if (n > 0) {
+        setMsg({
+          kind: "ok",
+          text: `"${t.name}" and its ${n} ${n === 1 ? "match" : "matches"} were deleted — restorable from Recently deleted for ${TRASH_DAYS} days.`,
+        });
+      }
     });
+  };
+
+  const onRestoreT = async (name: string) => {
+    setTrashBusy(name);
+    try {
+      await restoreTournament(name);
+      setMsg({ kind: "ok", text: `"${name}" is back, matches and all. Ratings recalculated.` });
+    } catch (e) {
+      setMsg({ kind: "err", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setTrashBusy(null);
+    }
+  };
+
+  const onPurgeT = async (name: string, matchCount: number) => {
+    if (
+      !confirm(
+        `Permanently delete "${name}" and its ${matchCount} ${matchCount === 1 ? "match" : "matches"}? This can't be undone.`,
+      )
+    )
+      return;
+    setTrashBusy(name);
+    try {
+      await purgeDeletedTournament(name);
+    } catch (e) {
+      setMsg({ kind: "err", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setTrashBusy(null);
+    }
   };
 
   const saveBracket = async (t: TournamentSummary, slots: (string | null)[]) => {
@@ -626,6 +667,103 @@ export default function Tournaments() {
                     <td style={{ color: "var(--text-dim)" }}>{m.score ?? "—"}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && tournamentTrash.length > 0 && !showTrash && (
+        <div style={{ textAlign: "center", marginTop: 2 }}>
+          <button
+            onClick={() => setShowTrash(true)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--text-dim)",
+              fontSize: 12,
+              cursor: "pointer",
+              padding: "6px 10px",
+              opacity: 0.7,
+            }}
+          >
+            Recently deleted ({tournamentTrash.length})
+          </button>
+        </div>
+      )}
+
+      {isAdmin && tournamentTrash.length > 0 && showTrash && (
+        <div className="card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <h2>Recently deleted</h2>
+            <button
+              className="btn ghost"
+              style={{ padding: "4px 12px", fontSize: 12 }}
+              onClick={() => setShowTrash(false)}
+            >
+              Hide
+            </button>
+          </div>
+          <p className="sub">
+            Deleted tournaments can be restored for {TRASH_DAYS} days — the bracket,
+            champion record and every match come back exactly as they were, and ratings
+            recalculate. After that, the data is removed permanently.
+          </p>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tournament</th>
+                  <th>Date</th>
+                  <th className="num">Matches</th>
+                  <th>Deleted</th>
+                  <th>Time left</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {tournamentTrash.map((t) => {
+                  const daysLeft = Math.max(
+                    0,
+                    Math.ceil(
+                      (Date.parse(t.deletedAt) + TRASH_DAYS * 86400000 - Date.now()) /
+                        86400000,
+                    ),
+                  );
+                  const rowBusy = trashBusy === t.name;
+                  return (
+                    <tr key={t.name}>
+                      <td>🏆 {t.name}</td>
+                      <td style={{ color: "var(--text-dim)" }}>{formatDate(t.date)}</td>
+                      <td className="num">{t.matchCount}</td>
+                      <td style={{ color: "var(--text-dim)" }}>
+                        {formatDate(t.deletedAt.slice(0, 10))}
+                      </td>
+                      <td>
+                        <span className={`badge ${daysLeft <= 5 ? "down" : "neutral"}`}>
+                          {daysLeft} {daysLeft === 1 ? "day" : "days"}
+                        </span>
+                      </td>
+                      <td className="actions-cell">
+                        <button
+                          className="btn ghost"
+                          style={{ padding: "4px 12px", fontSize: 12, marginRight: 8 }}
+                          disabled={rowBusy}
+                          onClick={() => onRestoreT(t.name)}
+                        >
+                          {rowBusy ? "…" : "Restore"}
+                        </button>
+                        <button
+                          className="btn danger"
+                          disabled={rowBusy}
+                          onClick={() => onPurgeT(t.name, t.matchCount)}
+                        >
+                          Delete now
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

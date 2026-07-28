@@ -56,6 +56,16 @@ create table if not exists public.deleted_players (
   deleted_at timestamptz not null default now()
 );
 
+-- ============ deleted tournaments (30-day restore window) ============
+create table if not exists public.deleted_tournaments (
+  name text primary key,
+  -- full snapshot of the tournament row, restored verbatim
+  data jsonb not null,
+  -- full snapshot of the tournament's match rows, restored verbatim
+  matches jsonb not null default '[]'::jsonb,
+  deleted_at timestamptz not null default now()
+);
+
 -- ============ set records (longest set played) ============
 create table if not exists public.set_records (
   id uuid primary key default gen_random_uuid(),
@@ -111,6 +121,7 @@ alter table public.profiles enable row level security;
 alter table public.tournaments enable row level security;
 alter table public.players enable row level security;
 alter table public.deleted_players enable row level security;
+alter table public.deleted_tournaments enable row level security;
 alter table public.set_records enable row level security;
 
 -- Everyone can read set records; only admins can manage them
@@ -133,6 +144,12 @@ create policy "admins can delete set records"
 drop policy if exists "admins manage deleted players" on public.deleted_players;
 create policy "admins manage deleted players"
   on public.deleted_players for all
+  using (public.is_admin())
+  with check (public.is_admin());
+
+drop policy if exists "admins manage deleted tournaments" on public.deleted_tournaments;
+create policy "admins manage deleted tournaments"
+  on public.deleted_tournaments for all
   using (public.is_admin())
   with check (public.is_admin());
 

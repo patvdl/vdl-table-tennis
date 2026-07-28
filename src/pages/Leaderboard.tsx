@@ -181,38 +181,36 @@ export default function Leaderboard() {
 
   const timeTravelling = Boolean(asOf) && asOf < today;
 
-  // Matches played on today's month-day in earlier years, newest year first
+  // The whole page follows the selected date; default is today (live)
+  const anchor = timeTravelling ? asOf : today;
+
+  // Every match played on the anchor's month-day, in that year or earlier,
+  // grouped by year (newest first). Time travelling includes the anchor
+  // day itself — pick Christmas 2025 and the 2025 matches head the list.
   const onThisDay = useMemo(() => {
-    const md = today.slice(5);
-    const curYear = today.slice(0, 4);
+    const md = anchor.slice(5);
     const byYear = new Map<string, EnrichedMatch[]>();
     for (const m of replayResult.enriched) {
-      if (m.date.slice(5) !== md || m.date.slice(0, 4) === curYear) continue;
+      if (m.date.slice(5) !== md || m.date > anchor) continue;
+      if (!timeTravelling && m.date === today) continue; // live view: past years only
       const y = m.date.slice(0, 4);
       const list = byYear.get(y);
       if (list) list.push(m);
       else byYear.set(y, [m]);
     }
-    return [...byYear.entries()]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([year, ms]) => {
-        // Pick the day's headline: a tournament match if there was one
-        // (the last is the biggest — finals are recorded last), otherwise
-        // the match with the largest rating swing.
-        const tMatches = ms.filter((m) => m.tournament);
-        const highlight = tMatches.length
-          ? tMatches[tMatches.length - 1]
-          : ms.reduce((best, m) =>
-              Math.abs(m.delta) > Math.abs(best.delta) ? m : best,
-            );
-        return { year, count: ms.length, highlight };
-      });
-  }, [replayResult, today]);
+    return [...byYear.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [replayResult, anchor, timeTravelling, today]);
 
-  const todayLabel = new Date(`${today}T00:00:00`).toLocaleDateString("en-AU", {
+  const anchorLabel = new Date(`${anchor}T00:00:00`).toLocaleDateString("en-AU", {
     day: "numeric",
     month: "long",
   });
+
+  // Rating race follows the same date: only matches up to the anchor
+  const raceMatches = useMemo(
+    () => (timeTravelling ? matches.filter((m) => m.date <= asOf) : matches),
+    [matches, timeTravelling, asOf],
+  );
 
   // Rank is always rating-based, regardless of the active sort
   const ratingRank = useMemo(() => {
@@ -331,7 +329,7 @@ export default function Leaderboard() {
           </select>
         </div>
         <div style={{ maxWidth: 220 }}>
-          <label className="field">View rankings on date</label>
+          <label className="field">View leaderboard on date</label>
           <input
             type="date"
             value={asOf || today}
@@ -424,48 +422,62 @@ export default function Leaderboard() {
     {onThisDay.length > 0 && (
       <div className="card">
         <h2>On this day</h2>
-        <p className="sub">{todayLabel} in VDL history.</p>
-        {onThisDay.map(({ year, count, highlight: h }) => (
-          <p key={year} style={{ margin: "8px 0", fontSize: 14 }}>
-            <b>{year}</b>
-            {" — "}
-            <Link
-              className="player-link"
-              to={`/player/${encodeURIComponent(h.winnerName)}`}
-              style={{ color: "var(--green)" }}
-            >
-              <PlayerName name={h.winnerName} />
-            </Link>
-            {" def. "}
-            <Link
-              className="player-link"
-              to={`/player/${encodeURIComponent(h.loserName)}`}
-            >
-              <PlayerName name={h.loserName} />
-            </Link>
-            {h.score ? ` ${h.score}` : ""}
-            {h.tournament && (
-              <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
-                🏆 {h.tournament}
+        <p className="sub">
+          Every match played on {anchorLabel}
+          {timeTravelling ? ` up to ${anchor.slice(0, 4)}` : " in years past"} — pick a
+          different date above to explore another day.
+        </p>
+        {onThisDay.map(([year, ms]) => (
+          <div key={year} style={{ margin: "12px 0" }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              {year}
+              <span style={{ color: "var(--text-dim)", fontWeight: 400, fontSize: 13 }}>
+                {" "}· {ms.length} {ms.length === 1 ? "match" : "matches"}
               </span>
-            )}
-            {count > 1 && (
-              <span style={{ color: "var(--text-dim)" }}>
-                {" "}· one of {count} matches that day
-              </span>
-            )}
-          </p>
+            </div>
+            {ms.map((m) => (
+              <p key={m.id} style={{ margin: "4px 0", fontSize: 14 }}>
+                <Link
+                  className="player-link"
+                  to={`/player/${encodeURIComponent(m.winnerName)}`}
+                  style={{ color: "var(--green)" }}
+                >
+                  <PlayerName name={m.winnerName} />
+                </Link>
+                {" def. "}
+                <Link
+                  className="player-link"
+                  to={`/player/${encodeURIComponent(m.loserName)}`}
+                >
+                  <PlayerName name={m.loserName} />
+                </Link>
+                {m.score ? (
+                  <span style={{ color: "var(--text-dim)" }}> {m.score}</span>
+                ) : null}
+                {m.tournament && (
+                  <span className="badge gold" style={{ marginLeft: 8, fontSize: 11 }}>
+                    🏆 {m.tournament}
+                  </span>
+                )}
+              </p>
+            ))}
+          </div>
         ))}
       </div>
     )}
 
-    {board.length > 1 && (
+    {view.board.length > 1 && (
       <div className="card">
         <h2>Rating race</h2>
         <p className="sub">
-          Every rating journey on one chart — tap a name to add or remove a player.
+          Every rating journey on one chart
+          {timeTravelling ? ` as it stood on ${formatDate(asOf)}` : ""} — tap a name to
+          add or remove a player.
         </p>
-        <RaceChart matches={matches} players={board.map((p) => p.name)} />
+        <RaceChart
+          matches={raceMatches}
+          players={view.board.map((p) => p.name)}
+        />
       </div>
     )}
 

@@ -12,6 +12,7 @@ import { replay, leaderboard, unratedPlayers, type ReplayResult } from "../lib/e
 import { analyzeTournament, type TournamentAnalysis } from "../lib/bracket";
 import type {
   DeletedPlayer,
+  DeletedTournament,
   Match,
   PlayerProfile,
   PlayerStats,
@@ -40,6 +41,8 @@ interface MatchesState {
   avatars: Map<string, string>;
   /** Soft-deleted players still inside their 30-day restore window */
   trash: DeletedPlayer[];
+  /** Soft-deleted tournaments (with their matches) inside the restore window */
+  tournamentTrash: DeletedTournament[];
   /** Admin-entered single-set scorelines (deuce marathons) */
   sets: SetRecordEntry[];
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
@@ -55,7 +58,10 @@ interface MatchesState {
   addTournament(name: string, date: string): Promise<void>;
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
   setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
+  /** Deletes the tournament AND all its matches (restorable for 30 days) */
   removeTournament(id: string): Promise<void>;
+  restoreTournament(name: string): Promise<void>;
+  purgeDeletedTournament(name: string): Promise<void>;
   addSetRecord(s: Omit<SetRecordEntry, "id">): Promise<void>;
   removeSetRecord(id: string): Promise<void>;
   refresh(): Promise<void>;
@@ -68,6 +74,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
   const [tournamentRows, setTournamentRows] = useState<Tournament[]>([]);
   const [playerRows, setPlayerRows] = useState<PlayerProfile[]>([]);
   const [trash, setTrash] = useState<DeletedPlayer[]>([]);
+  const [tournamentTrash, setTournamentTrash] = useState<DeletedTournament[]>([]);
   const [sets, setSets] = useState<SetRecordEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +100,11 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
       } catch {
         // Trash is non-critical (and hidden from non-admins anyway)
         setTrash([]);
+      }
+      try {
+        setTournamentTrash(await store.loadTournamentTrash());
+      } catch {
+        setTournamentTrash([]);
       }
       try {
         setSets(await store.loadSets());
@@ -164,6 +176,7 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     tournaments,
     avatars,
     trash,
+    tournamentTrash,
     sets,
     async setPlayerAvatar(name, avatar) {
       await store.setPlayerAvatar(name, avatar);
@@ -215,6 +228,14 @@ export function MatchesProvider({ children }: { children: ReactNode }) {
     },
     async removeTournament(id) {
       await store.removeTournament(id);
+      await refresh();
+    },
+    async restoreTournament(name) {
+      await store.restoreTournament(name);
+      await refresh();
+    },
+    async purgeDeletedTournament(name) {
+      await store.purgeDeletedTournament(name);
       await refresh();
     },
     async addSetRecord(s) {

@@ -6,6 +6,8 @@ interface Props {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  /** Restrict the list to these names (e.g. a tournament's bracket) */
+  only?: string[];
 }
 
 /**
@@ -13,15 +15,16 @@ interface Props {
  * when the typed letters match exactly one player. Typing a brand-new name
  * is allowed (that's how new players get created).
  */
-export default function PlayerCombo({ value, onChange, placeholder }: Props) {
+export default function PlayerCombo({ value, onChange, placeholder, only }: Props) {
   const { playerNames } = useMatches();
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(-1);
 
+  const pool = only ?? playerNames;
   const typed = value.trim().toLowerCase();
   const options = typed
-    ? playerNames.filter((n) => n.toLowerCase().startsWith(typed))
-    : playerNames;
+    ? pool.filter((n) => n.toLowerCase().startsWith(typed))
+    : pool;
 
   const select = (n: string) => {
     onChange(n);

@@ -18,7 +18,7 @@ const COLORS = [
 ];
 
 const W = 860;
-const H = 330;
+const BASE_H = 330;
 const PAD = { top: 18, right: 96, bottom: 30, left: 48 };
 const DEFAULT_SHOWN = 5;
 const LABEL_GAP = 17;
@@ -37,14 +37,19 @@ interface Props {
  * moves when that player plays.
  */
 export default function RaceChart({ matches, players }: Props) {
-  const [selected, setSelected] = useState<string[]>(() =>
-    players.slice(0, DEFAULT_SHOWN),
-  );
+  // null = untouched: default to the current top 5 (follows date changes)
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const selected = picked ?? players.slice(0, DEFAULT_SHOWN);
 
   const toggle = (name: string) =>
-    setSelected((prev) =>
-      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    setPicked(
+      selected.includes(name)
+        ? selected.filter((n) => n !== name)
+        : [...selected, name],
     );
+
+  const allOn = players.length > 0 && players.every((p) => selected.includes(p));
+  const toggleAll = () => setPicked(allOn ? [] : players);
 
   // Rating at the end of every match date, per player, carried forward.
   // The x-axis is real time, so the replay runs in date order here — a
@@ -93,6 +98,13 @@ export default function RaceChart({ matches, players }: Props) {
 
   if (players.length === 0) return null;
 
+  // Grow the chart so every end label gets its own row — with the whole
+  // family selected the names stack, so give them the room they need.
+  const H = Math.max(
+    BASE_H,
+    PAD.top + PAD.bottom + shown.length * LABEL_GAP + 12,
+  );
+
   let t0 = Infinity;
   let t1 = -Infinity;
   let rMin = Infinity;
@@ -140,10 +152,14 @@ export default function RaceChart({ matches, players }: Props) {
     l.y = Math.max(l.y, prev + LABEL_GAP);
     prev = l.y;
   }
-  const overshoot = labels.length
-    ? labels[labels.length - 1].y - (H - PAD.bottom)
-    : 0;
-  if (overshoot > 0) for (const l of labels) l.y -= overshoot;
+  // If the stack ran past the bottom edge, squeeze it back up from the
+  // bottom. The chart height is sized so every label fits, so this can
+  // never push the top label off the chart.
+  let cap = H - PAD.bottom;
+  for (let i = labels.length - 1; i >= 0; i--) {
+    labels[i].y = Math.min(labels[i].y, cap);
+    cap = labels[i].y - LABEL_GAP;
+  }
 
   const midT = t0 + (t1 - t0) / 2;
   const dateLabel = (t: number) => formatDate(new Date(t).toISOString().slice(0, 10));
@@ -151,6 +167,14 @@ export default function RaceChart({ matches, players }: Props) {
   return (
     <div>
       <div className="chip-row">
+        <button
+          type="button"
+          className="chip on"
+          style={{ borderColor: "var(--text-dim)" }}
+          onClick={toggleAll}
+        >
+          {allOn ? "Deselect all" : "Select all"}
+        </button>
         {players.map((p, i) => {
           const on = selected.includes(p);
           const color = COLORS[i % COLORS.length];

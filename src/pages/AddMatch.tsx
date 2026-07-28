@@ -3,6 +3,7 @@ import { useMatches } from "../store/matches";
 import { useAuth } from "../store/auth";
 import { predictMatch } from "../lib/elo";
 import { pct, round0 } from "../lib/format";
+import { pendingContests } from "../lib/simulate";
 import PlayerCombo from "../components/PlayerCombo";
 
 function today(): string {
@@ -29,6 +30,26 @@ export default function AddMatch() {
 
   const name1 = p1.trim();
   const name2 = p2.trim();
+
+  // The tournament being recorded into, and what its bracket allows
+  const selectedT = isTournament
+    ? activeTournaments.find((t) => t.name === tournament)
+    : undefined;
+  const drawPlayers = useMemo(() => {
+    if (!selectedT?.bracket) return null; // no stored draw — anyone can play
+    return [...new Set(selectedT.bracket.filter((s): s is string => Boolean(s)))].sort(
+      (a, b) => a.localeCompare(b),
+    );
+  }, [selectedT]);
+  // The bracket's playable matchups right now: pending contests where both
+  // players are known, plus the 3rd-place playoff once the semis are done.
+  const upcoming = useMemo(() => {
+    if (!selectedT?.bracket) return null;
+    const a = selectedT.analysis;
+    const pairs = pendingContests(a.planned).map((c) => [c.a, c.b] as [string, string]);
+    if (a.thirdPlacePending) pairs.push(a.thirdPlacePending);
+    return pairs;
+  }, [selectedT]);
 
   const preview = useMemo(() => {
     if (!name1 || !name2 || name1 === name2) return null;
@@ -57,6 +78,34 @@ export default function AddMatch() {
     if (name1 === name2) {
       setMsg({ kind: "err", text: "Players must be different." });
       return;
+    }
+    if (isTournament) {
+      if (!tournament.trim()) {
+        setMsg({ kind: "err", text: "Pick a tournament, or untick the Tournament box." });
+        return;
+      }
+      if (drawPlayers) {
+        const outsiders = [name1, name2].filter((n) => !drawPlayers.includes(n));
+        if (outsiders.length > 0) {
+          setMsg({
+            kind: "err",
+            text: `Can't add: ${outsiders.join(" and ")} ${outsiders.length === 1 ? "isn't" : "aren't"} in the ${tournament} bracket.`,
+          });
+          return;
+        }
+        const isUpcoming = upcoming?.some(
+          ([a, b]) =>
+            (a === name1 && b === name2) || (a === name2 && b === name1),
+        );
+        if (!isUpcoming) {
+          const next = upcoming?.map(([a, b]) => `${a} vs ${b}`).join(", ");
+          setMsg({
+            kind: "err",
+            text: `Can't add: ${name1} vs ${name2} isn't one of ${tournament}'s playable bracket matches right now${next ? ` (next up: ${next})` : ""}.`,
+          });
+          return;
+        }
+      }
     }
     setSaving(true);
     try {
@@ -124,17 +173,26 @@ export default function AddMatch() {
             </label>
             {isTournament &&
               (activeTournaments.length > 0 ? (
-                <select
-                  style={{ marginTop: 8 }}
-                  value={tournament}
-                  onChange={(e) => setTournament(e.target.value)}
-                >
-                  {activeTournaments.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    style={{ marginTop: 8 }}
+                    value={tournament}
+                    onChange={(e) => setTournament(e.target.value)}
+                  >
+                    {activeTournaments.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  {upcoming && (
+                    <p className="sub" style={{ marginTop: 8, fontSize: 12 }}>
+                      {upcoming.length > 0
+                        ? `Playable bracket matches: ${upcoming.map(([a, b]) => `${a} vs ${b}`).join(" · ")}`
+                        : "The bracket has no playable matches right now — earlier rounds must be recorded first."}
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="sub" style={{ marginTop: 8, fontSize: 12 }}>
                   No active tournament. Create one from the Tournaments tab first.
@@ -147,11 +205,11 @@ export default function AddMatch() {
         <div className="form-row">
           <div>
             <label className="field">Player 1</label>
-            <PlayerCombo value={p1} onChange={setP1} />
+            <PlayerCombo value={p1} onChange={setP1} only={drawPlayers ?? undefined} />
           </div>
           <div>
             <label className="field">Player 2</label>
-            <PlayerCombo value={p2} onChange={setP2} />
+            <PlayerCombo value={p2} onChange={setP2} only={drawPlayers ?? undefined} />
           </div>
         </div>
 

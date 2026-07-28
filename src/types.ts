@@ -65,6 +65,14 @@ export interface DeletedPlayer {
   deletedAt: string; // ISO timestamp
 }
 
+/** A soft-deleted tournament (with its matches) waiting in the 30-day restore window */
+export interface DeletedTournament {
+  name: string;
+  date: string; // tournament date, ISO yyyy-mm-dd
+  matchCount: number;
+  deletedAt: string; // ISO timestamp
+}
+
 /**
  * A single-set scoreline worth remembering (deuce marathons). Match results
  * don't record per-set points, so admins enter these separately for the

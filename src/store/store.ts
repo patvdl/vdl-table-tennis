@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import type {
   DeletedPlayer,
+  DeletedTournament,
   Match,
   PlayerProfile,
   SetRecordEntry,
@@ -39,7 +40,18 @@ export interface DataStore {
   addTournament(name: string, date: string): Promise<void>;
   setTournamentStatus(id: string, status: Tournament["status"]): Promise<void>;
   setTournamentBracket(id: string, bracket: Tournament["bracket"]): Promise<void>;
+  /**
+   * Delete a tournament AND every match recorded under it. If it had
+   * matches, everything is kept in a trash store for TRASH_DAYS so the
+   * whole thing can be restored.
+   */
   removeTournament(id: string): Promise<void>;
+  /** Soft-deleted tournaments still inside the restore window */
+  loadTournamentTrash(): Promise<DeletedTournament[]>;
+  /** Bring back a soft-deleted tournament with all its matches */
+  restoreTournament(name: string): Promise<void>;
+  /** Permanently discard a soft-deleted tournament's data right now */
+  purgeDeletedTournament(name: string): Promise<void>;
   loadPlayers(): Promise<PlayerProfile[]>;
   /** Set a player's profile photo (data URL); null removes it */
   setPlayerAvatar(name: string, avatar: string | null): Promise<void>;
@@ -117,6 +129,7 @@ const LOCAL_T_KEY = "vdl-tt-tournaments-v1";
 const LOCAL_P_KEY = "vdl-tt-avatars-v1";
 const LOCAL_D_KEY = "vdl-tt-trash-v1";
 const LOCAL_S_KEY = "vdl-tt-sets-v1";
+const LOCAL_DT_KEY = "vdl-tt-tournament-trash-v1";
 
 /** Full snapshot of a deleted player, enough to restore them completely */
 interface TrashEntry {
@@ -137,6 +150,26 @@ function readTrash(): TrashEntry[] {
 
 function writeTrash(entries: TrashEntry[]) {
   localStorage.setItem(LOCAL_D_KEY, JSON.stringify(entries));
+}
+
+/** Full snapshot of a deleted tournament, enough to restore it completely */
+interface TournamentTrashEntry {
+  tournament: Tournament;
+  matches: Match[];
+  deletedAt: string;
+}
+
+function readTournamentTrash(): TournamentTrashEntry[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_DT_KEY);
+    return raw ? (JSON.parse(raw) as TournamentTrashEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeTournamentTrash(entries: TournamentTrashEntry[]) {
+  localStorage.setItem(LOCAL_DT_KEY, JSON.stringify(entries));
 }
 
 const localStore: DataStore = {
@@ -206,8 +239,80 @@ const localStore: DataStore = {
     localStorage.setItem(LOCAL_T_KEY, JSON.stringify(all));
   },
   async removeTournament(id) {
-    const all = (await this.loadTournaments()).filter((t) => t.id !== id);
-    localStorage.setItem(LOCAL_T_KEY, JSON.stringify(all));
+    const all = await this.loadTournaments();
+    const target = all.find((t) => t.id === id);
+    if (!target) return;
+
+    const matches = await this.load();
+    const mine = matches.filter((m) => m.tournament === target.name);
+
+    // Only tournaments with recorded matches get a restore window
+    if (mine.length > 0) {
+      const trash = readTournamentTrash().filter(
+        (t) => t.tournament.name !== target.name,
+      );
+      trash.push({
+        tournament: target,
+        matches: mine,
+        deletedAt: new Date().toISOString(),
+      });
+      writeTournamentTrash(trash);
+    }
+
+    localStorage.setItem(
+      LOCAL_KEY,
+      JSON.stringify(matches.filter((m) => m.tournament !== target.name)),
+    );
+    localStorage.setItem(
+      LOCAL_T_KEY,
+      JSON.stringify(all.filter((t) => t.id !== id)),
+    );
+  },
+  async loadTournamentTrash() {
+    const all = readTournamentTrash();
+    const cutoff = Date.now() - TRASH_MS;
+    const keep = all.filter((t) => Date.parse(t.deletedAt) >= cutoff);
+    if (keep.length !== all.length) writeTournamentTrash(keep); // lazy 30-day purge
+    return keep.map((t) => ({
+      name: t.tournament.name,
+      date: t.tournament.date,
+      matchCount: t.matches.length,
+      deletedAt: t.deletedAt,
+    }));
+  },
+  async restoreTournament(name) {
+    const trash = readTournamentTrash();
+    const entry = trash.find((t) => t.tournament.name === name);
+    if (!entry) throw new Error("Nothing to restore for that tournament.");
+
+    const tournaments = await this.loadTournaments();
+    if (tournaments.some((t) => t.name === name)) {
+      throw new Error(
+        `A tournament named "${name}" already exists — delete or rename it first.`,
+      );
+    }
+
+    const all = await this.load();
+    const ids = new Set(all.map((m) => m.id));
+    const seqs = new Set(all.map((m) => m.seq));
+    let nextSeq = all.reduce((mx, m) => Math.max(mx, m.seq), 0) + 1;
+    for (const m of [...entry.matches].sort((a, b) => a.seq - b.seq)) {
+      if (ids.has(m.id)) continue;
+      // matches added since the deletion may have reused seq numbers
+      all.push(seqs.has(m.seq) ? { ...m, seq: nextSeq++ } : m);
+    }
+    all.sort((a, b) => a.seq - b.seq);
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+
+    tournaments.push(entry.tournament);
+    localStorage.setItem(LOCAL_T_KEY, JSON.stringify(tournaments));
+
+    writeTournamentTrash(trash.filter((t) => t.tournament.name !== name));
+  },
+  async purgeDeletedTournament(name) {
+    writeTournamentTrash(
+      readTournamentTrash().filter((t) => t.tournament.name !== name),
+    );
   },
   async loadPlayers() {
     try {
@@ -258,6 +363,22 @@ const localStore: DataStore = {
     writeTrash(
       readTrash().map((t) => ({
         ...t,
+        matches: t.matches.map((m) => ({
+          ...m,
+          player1: m.player1 === oldName ? newName : m.player1,
+          player2: m.player2 === oldName ? newName : m.player2,
+        })),
+      })),
+    );
+    writeTournamentTrash(
+      readTournamentTrash().map((t) => ({
+        ...t,
+        tournament: t.tournament.bracket
+          ? {
+              ...t.tournament,
+              bracket: t.tournament.bracket.map((s) => (s === oldName ? newName : s)),
+            }
+          : t.tournament,
         matches: t.matches.map((m) => ({
           ...m,
           player1: m.player1 === oldName ? newName : m.player1,
@@ -436,7 +557,99 @@ function makeSupabaseStore(): DataStore {
       if (error) throw new Error(error.message);
     },
     async removeTournament(id) {
-      const { error } = await sb.from("tournaments").delete().eq("id", id);
+      const { data: target, error } = await sb
+        .from("tournaments")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw new Error(error.message);
+
+      // Snapshot the tournament's matches first so the delete is recoverable
+      const { data: mine, error: mErr } = await sb
+        .from("matches")
+        .select("*")
+        .eq("tournament", String(target.name));
+      if (mErr) throw new Error(mErr.message);
+
+      if ((mine ?? []).length > 0) {
+        const t = await sb.from("deleted_tournaments").upsert({
+          name: target.name,
+          data: target,
+          matches: mine,
+          deleted_at: new Date().toISOString(),
+        });
+        if (t.error) throw new Error(t.error.message);
+      }
+
+      let r = await sb.from("matches").delete().eq("tournament", String(target.name));
+      if (r.error) throw new Error(r.error.message);
+      r = await sb.from("tournaments").delete().eq("id", id);
+      if (r.error) throw new Error(r.error.message);
+    },
+    async loadTournamentTrash() {
+      // Lazy 30-day purge; silently affects 0 rows for non-admins (RLS)
+      const cutoff = new Date(Date.now() - TRASH_MS).toISOString();
+      await sb.from("deleted_tournaments").delete().lt("deleted_at", cutoff);
+
+      const { data, error } = await sb
+        .from("deleted_tournaments")
+        .select("name, deleted_at, matches, data")
+        .order("deleted_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => ({
+        name: String(r.name),
+        date: String((r.data as Record<string, unknown>)?.date ?? ""),
+        matchCount: Array.isArray(r.matches) ? r.matches.length : 0,
+        deletedAt: String(r.deleted_at),
+      }));
+    },
+    async restoreTournament(name) {
+      const { data: entry, error } = await sb
+        .from("deleted_tournaments")
+        .select("*")
+        .eq("name", name)
+        .single();
+      if (error) throw new Error(error.message);
+
+      const { data: clash } = await sb
+        .from("tournaments")
+        .select("id")
+        .eq("name", name)
+        .maybeSingle();
+      if (clash) {
+        throw new Error(
+          `A tournament named "${name}" already exists — delete or rename it first.`,
+        );
+      }
+
+      const t = await sb.from("tournaments").insert(entry.data);
+      if (t.error) throw new Error(t.error.message);
+
+      // Matches added since the deletion may have reused seq numbers, so
+      // re-slot any colliding rows at the end (original order preserved).
+      const rows = Array.isArray(entry.matches)
+        ? (entry.matches as Record<string, unknown>[])
+        : [];
+      if (rows.length > 0) {
+        const current = await this.load();
+        const ids = new Set(current.map((m) => m.id));
+        const seqs = new Set(current.map((m) => m.seq));
+        let nextSeq = current.reduce((mx, m) => Math.max(mx, m.seq), 0) + 1;
+        const inserts = [...rows]
+          .sort((a, b) => Number(a.seq) - Number(b.seq))
+          .filter((r) => !ids.has(String(r.id)))
+          .map((r) => (seqs.has(Number(r.seq)) ? { ...r, seq: nextSeq++ } : r));
+        if (inserts.length > 0) {
+          const m = await sb.from("matches").insert(inserts);
+          if (m.error) throw new Error(m.error.message);
+        }
+      }
+
+      const d = await sb.from("deleted_tournaments").delete().eq("name", name);
+      if (d.error) throw new Error(d.error.message);
+    },
+    async purgeDeletedTournament(name) {
+      const { error } = await sb.from("deleted_tournaments").delete().eq("name", name);
       if (error) throw new Error(error.message);
     },
     async loadPlayers() {
@@ -488,6 +701,40 @@ function makeSupabaseStore(): DataStore {
             player2: m.player2 === oldName ? newName : m.player2,
           }));
           const u = await sb.from("deleted_players").update({ matches }).eq("name", row.name);
+          if (u.error) throw new Error(u.error.message);
+        }
+      }
+      const dt = await sb.from("deleted_tournaments").select("name, data, matches");
+      if (!dt.error) {
+        for (const row of dt.data ?? []) {
+          const rows = Array.isArray(row.matches)
+            ? (row.matches as Record<string, unknown>[])
+            : [];
+          const tdata = (row.data ?? {}) as Record<string, unknown>;
+          const bracket = Array.isArray(tdata.bracket)
+            ? (tdata.bracket as (string | null)[])
+            : null;
+          const touchesMatches = rows.some(
+            (m) => m.player1 === oldName || m.player2 === oldName,
+          );
+          const touchesBracket = bracket?.includes(oldName) ?? false;
+          if (!touchesMatches && !touchesBracket) continue;
+          const u = await sb
+            .from("deleted_tournaments")
+            .update({
+              matches: rows.map((m) => ({
+                ...m,
+                player1: m.player1 === oldName ? newName : m.player1,
+                player2: m.player2 === oldName ? newName : m.player2,
+              })),
+              data: touchesBracket
+                ? {
+                    ...tdata,
+                    bracket: bracket!.map((s) => (s === oldName ? newName : s)),
+                  }
+                : tdata,
+            })
+            .eq("name", row.name);
           if (u.error) throw new Error(u.error.message);
         }
       }

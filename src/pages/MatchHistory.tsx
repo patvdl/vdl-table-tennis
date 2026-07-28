@@ -13,15 +13,20 @@ export default function MatchHistory() {
   const { replayResult, playerNames, removeMatch, moveMatch } = useMatches();
   const { role } = useAuth();
   const [filter, setFilter] = useState("");
+  const [onDate, setOnDate] = useState("");
   const [shown, setShown] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
   const [moving, setMoving] = useState<EnrichedMatch | null>(null);
 
+  const firstDate = replayResult.enriched[0]?.date;
+  const lastDate = replayResult.enriched[replayResult.enriched.length - 1]?.date;
+
   const rows = useMemo(() => {
-    const all = [...replayResult.enriched].reverse(); // newest first
-    if (!filter) return all;
-    return all.filter((m) => m.player1 === filter || m.player2 === filter);
-  }, [replayResult, filter]);
+    let all = [...replayResult.enriched].reverse(); // newest first
+    if (filter) all = all.filter((m) => m.player1 === filter || m.player2 === filter);
+    if (onDate) all = all.filter((m) => m.date === onDate);
+    return all;
+  }, [replayResult, filter, onDate]);
 
   const onDelete = async (id: string) => {
     if (!confirm("Delete this match? Ratings will be recalculated.")) return;
@@ -38,23 +43,59 @@ export default function MatchHistory() {
       <h2>Match History</h2>
       <p className="sub">Every match ever recorded, newest first. ELO shifts shown per match.</p>
 
-      <div style={{ maxWidth: 280, marginBottom: 16 }}>
-        <label className="field">Filter by player</label>
-        <select
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            setShown(PAGE);
-          }}
-        >
-          <option value="">All players</option>
-          {playerNames.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ width: 220, maxWidth: "100%" }}>
+          <label className="field">Filter by player</label>
+          <select
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setShown(PAGE);
+            }}
+          >
+            <option value="">All players</option>
+            {playerNames.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ maxWidth: 220 }}>
+          <label className="field">View matches on date</label>
+          <input
+            type="date"
+            value={onDate}
+            min={firstDate}
+            max={lastDate}
+            onChange={(e) => {
+              setOnDate(e.target.value);
+              setShown(PAGE);
+            }}
+          />
+        </div>
+        {onDate && (
+          <button className="btn ghost" onClick={() => setOnDate("")}>
+            Show all dates
+          </button>
+        )}
       </div>
+
+      {onDate && (
+        <p className="sub" style={{ marginTop: -6 }}>
+          {rows.length === 0
+            ? `No matches were played on ${formatDate(onDate)}${filter ? ` by ${filter}` : ""}.`
+            : `${rows.length} ${rows.length === 1 ? "match" : "matches"} played on ${formatDate(onDate)}${filter ? ` by ${filter}` : ""}.`}
+        </p>
+      )}
 
       <div className="table-wrap pin-2">
         <table>
