@@ -250,10 +250,10 @@ export default function Records() {
           </div>
           {potyOpen && (
             <p className="sub">
-              Judged on the whole season, quality over quantity: win rate, time spent at
-              #1 and in the top 5, and peak rating carry the most weight, with quality of
-              wins (beating top-5 and #1 ranked players) and win count behind them. Every
-              rated player who played that year is in the race.
+              Judged on the whole season, quality over quantity: win rate and time spent
+              at #1 and in the top 5 carry the most weight, then peak rating, with quality
+              of wins (beating top-5 and #1 ranked players) and win count behind them.
+              Every rated player who played that year is in the race.
               {season.inProgress &&
                 " This season is still in progress — the race can change with every match."}
             </p>

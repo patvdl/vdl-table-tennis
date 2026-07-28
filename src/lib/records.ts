@@ -507,13 +507,14 @@ function computeSeasons(enriched: EnrichedMatch[], boards: DailyBoard[]): Season
     const nDominance = norm(dominance);
     const nRating = norm(ratingX);
 
+    // Win rate and time at the top lead the race; peak rating is a rung below.
     for (const s of rated) {
       s.score =
         Math.round(
           100 *
-            (0.25 * s.winPct +
-              0.25 * nDominance(s) +
-              0.25 * nRating(s) +
+            (0.28 * s.winPct +
+              0.28 * nDominance(s) +
+              0.19 * nRating(s) +
               0.15 * nQuality(s) +
               0.1 * nWins(s)) *
             10,

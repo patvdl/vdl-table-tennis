@@ -109,14 +109,18 @@ export default function HeadToHeadPage() {
             <div className="h2h-side">
               <Avatar player={a} size={264} />
               <div className="name win-a" style={{ marginTop: 8 }}>
-                <PlayerName name={a} />
+                <Link className="player-link" to={`/player/${encodeURIComponent(a)}`}>
+                  <PlayerName name={a} />
+                </Link>
               </div>
             </div>
             <div className="h2h-vs">VS</div>
             <div className="h2h-side">
               <Avatar player={b} size={264} />
               <div className="name win-b" style={{ marginTop: 8 }}>
-                <PlayerName name={b} />
+                <Link className="player-link" to={`/player/${encodeURIComponent(b)}`}>
+                  <PlayerName name={b} />
+                </Link>
               </div>
             </div>
           </div>
@@ -134,7 +138,9 @@ export default function HeadToHeadPage() {
               <div className="h2h-side">
                 <Avatar player={h2h.a} size={264} />
                 <div className="name win-a" style={{ marginTop: 8 }}>
-                  <PlayerName name={h2h.a} />
+                  <Link className="player-link" to={`/player/${encodeURIComponent(h2h.a)}`}>
+                    <PlayerName name={h2h.a} />
+                  </Link>
                 </div>
                 <div className="big win-a">{h2h.winsA}</div>
                 <div className="meta">{pct(h2h.winsA / h2h.total)} of meetings</div>
@@ -143,7 +149,9 @@ export default function HeadToHeadPage() {
               <div className="h2h-side">
                 <Avatar player={h2h.b} size={264} />
                 <div className="name win-b" style={{ marginTop: 8 }}>
-                  <PlayerName name={h2h.b} />
+                  <Link className="player-link" to={`/player/${encodeURIComponent(h2h.b)}`}>
+                    <PlayerName name={h2h.b} />
+                  </Link>
                 </div>
                 <div className="big win-b">{h2h.winsB}</div>
                 <div className="meta">{pct(h2h.winsB / h2h.total)} of meetings</div>
@@ -271,7 +279,12 @@ export default function HeadToHeadPage() {
                         <td>{formatDate(m.date)}</td>
                         <td>
                           <span className={m.winnerName === h2h.a ? "win-a" : "win-b"} style={{ fontWeight: 700 }}>
-                            <PlayerName name={m.winnerName} />
+                            <Link
+                              className="player-link"
+                              to={`/player/${encodeURIComponent(m.winnerName)}`}
+                            >
+                              <PlayerName name={m.winnerName} />
+                            </Link>
                           </span>
                         </td>
                         <td style={{ color: "var(--text-dim)" }}>
