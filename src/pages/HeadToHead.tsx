@@ -270,6 +270,9 @@ export default function HeadToHeadPage() {
               {sideCard(h2h.a, "win-a")}
 
               <div className="duel">
+                <div className="duel-meta" style={{ marginTop: 0, marginBottom: 10 }}>
+                  {h2h.total} {h2h.total === 1 ? "match" : "matches"} played
+                </div>
                 <div className="duel-row">
                   <div className="duel-vals">
                     <span className="duel-a">{h2h.winsA}</span>
@@ -333,7 +336,21 @@ export default function HeadToHeadPage() {
                         ),
                   )}
                 </div>
-                <div className="duel-meta">
+                {h2h.streakHolder && (
+                  <div className="duel-meta">
+                    <span
+                      className={h2h.streakHolder === h2h.a ? "win-a" : "win-b"}
+                      style={{ fontWeight: 700 }}
+                    >
+                      <PlayerName name={h2h.streakHolder} />
+                    </span>{" "}
+                    has won the last{" "}
+                    {h2h.streakLength === 1
+                      ? "meeting"
+                      : `${h2h.streakLength} meetings`}
+                  </div>
+                )}
+                <div className="duel-meta" style={{ marginTop: 4 }}>
                   first meeting {formatDate(h2h.firstMeeting)} · latest{" "}
                   {formatDate(h2h.lastMeeting)}
                 </div>
