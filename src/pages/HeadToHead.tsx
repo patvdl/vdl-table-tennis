@@ -158,53 +158,39 @@ export default function HeadToHeadPage() {
               </div>
             </div>
 
-            <div className="stat-grid">
-              <div className="stat-tile">
-                <div className="label">Current streak</div>
-                <div className="value">
-                  {h2h.streakHolder ? `${h2h.streakLength}` : "—"}
-                </div>
-                <div className="hint">
-                  {h2h.streakHolder
-                    ? `${h2h.streakHolder} has won the last ${h2h.streakLength}`
-                    : "no matches yet"}
-                </div>
+            <div className="tape">
+              <div className="tape-row">
+                <span className={`tape-a ${h2h.streakHolder === h2h.a ? "win-a" : "tape-dim"}`}>
+                  {h2h.streakHolder === h2h.a ? `W${h2h.streakLength}` : "—"}
+                </span>
+                <span className="tape-label" title="Who has won the recent meetings in a row">
+                  Current streak
+                </span>
+                <span className={`tape-b ${h2h.streakHolder === h2h.b ? "win-b" : "tape-dim"}`}>
+                  {h2h.streakHolder === h2h.b ? `W${h2h.streakLength}` : "—"}
+                </span>
               </div>
-              <div className="stat-tile">
-                <div className="label">Best streak — {h2h.a}</div>
-                <div className="value">{h2h.bestStreakA}</div>
-                <div className="hint">consecutive wins</div>
+              <div className="tape-row">
+                <span className="tape-a win-a">W{h2h.bestStreakA}</span>
+                <span className="tape-label" title="Most consecutive wins in this matchup">
+                  Best streak
+                </span>
+                <span className="tape-b win-b">W{h2h.bestStreakB}</span>
               </div>
-              <div className="stat-tile">
-                <div className="label">Best streak — {h2h.b}</div>
-                <div className="value">{h2h.bestStreakB}</div>
-                <div className="hint">consecutive wins</div>
-              </div>
-              <div className="stat-tile">
-                <div className="label">Rating swing — {h2h.a}</div>
-                <div className={`value ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}>
+              <div className="tape-row">
+                <span className={`tape-a ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}>
                   {signed(h2h.ratingSwingA)}
-                </div>
-                <div className="hint">net ELO from this matchup</div>
-              </div>
-              <div className="stat-tile">
-                <div className="label">Rating swing — {h2h.b}</div>
-                <div className={`value ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}>
+                </span>
+                <span className="tape-label" title="Net ELO gained or lost from this matchup">
+                  Rating swing
+                </span>
+                <span className={`tape-b ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}>
                   {signed(h2h.ratingSwingB)}
-                </div>
-                <div className="hint">net ELO from this matchup</div>
+                </span>
               </div>
-              <div className="stat-tile">
-                <div className="label">First meeting</div>
-                <div className="value" style={{ fontSize: 15 }}>
-                  {formatDate(h2h.firstMeeting)}
-                </div>
-              </div>
-              <div className="stat-tile">
-                <div className="label">Last meeting</div>
-                <div className="value" style={{ fontSize: 15 }}>
-                  {formatDate(h2h.lastMeeting)}
-                </div>
+              <div className="tape-meta">
+                first meeting {formatDate(h2h.firstMeeting)} · latest{" "}
+                {formatDate(h2h.lastMeeting)}
               </div>
             </div>
 
