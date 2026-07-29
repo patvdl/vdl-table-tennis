@@ -9,7 +9,7 @@ import PlayerName from "../components/PlayerName";
 import StreakBadge from "../components/StreakBadge";
 
 export default function HeadToHeadPage() {
-  const { playerNames, replayResult, board, tournaments } = useMatches();
+  const { playerNames, replayResult, board } = useMatches();
   const [params, setParams] = useSearchParams();
 
   const [a, setA] = useState(params.get("a") ?? "");
@@ -82,7 +82,6 @@ export default function HeadToHeadPage() {
   const sideCard = (name: string, cls: "win-a" | "win-b") => {
     const s = replayResult.stats.get(name);
     const rank = board.findIndex((p) => p.name === name) + 1;
-    const titleList = tournaments.filter((t) => t.champion === name);
     const since = firstPlayed.get(name);
     return (
       <div className="side-card">
@@ -94,6 +93,12 @@ export default function HeadToHeadPage() {
         <div className="sc-row">
           <span className="k">Rank</span>
           <span className="v mono">{rank > 0 ? `#${rank}` : "Unrated"}</span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Career-high rank</span>
+          <span className="v mono">
+            {s && s.bestRankDate ? `#${s.bestRank}` : "—"}
+          </span>
         </div>
         <div className="sc-row">
           <span className="k">Rating</span>
@@ -120,15 +125,6 @@ export default function HeadToHeadPage() {
           <span className="k">Current streak</span>
           <span className="v">
             <StreakBadge streak={s?.streak ?? 0} />
-          </span>
-        </div>
-        <div className="sc-row">
-          <span className="k">Titles</span>
-          <span
-            className="v mono"
-            title={titleList.map((t) => t.name).join(", ") || undefined}
-          >
-            {titleList.length}
           </span>
         </div>
         <div className="sc-row">
