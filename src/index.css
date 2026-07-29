@@ -140,6 +140,36 @@ button {
   margin-top: 20px;
 }
 
+/* Slim date-picker strip above the leaderboard — the whole page follows it */
+.time-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  color: var(--text-dim);
+}
+
+.time-bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.time-bar select,
+.time-bar input[type="date"] {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.time-bar .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
 .card h2 {
   margin: 0 0 4px;
   font-size: 17px;
