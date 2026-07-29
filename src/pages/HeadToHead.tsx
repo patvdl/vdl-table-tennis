@@ -67,9 +67,12 @@ export default function HeadToHeadPage() {
     return any ? { a: sa, b: sb } : null;
   }, [h2h]);
 
-  /** Split bar: green share grows with A's lead, blue with B's */
-  const duelBar = (va: number, vb: number) => {
-    const shareA = va + vb > 0 ? va / (va + vb) : 0.5;
+  /**
+   * Split bar: green share grows with A's lead, blue with B's.
+   * Clamped so the trailing player always keeps a sliver of colour.
+   */
+  const shareBar = (rawShareA: number) => {
+    const shareA = Math.min(0.95, Math.max(0.05, rawShareA));
     return (
       <div className="duel-bar">
         <div className="seg-a" style={{ width: `${shareA * 100}%` }} />
@@ -77,6 +80,9 @@ export default function HeadToHeadPage() {
       </div>
     );
   };
+
+  const duelBar = (va: number, vb: number) =>
+    shareBar(va + vb > 0 ? va / (va + vb) : 0.5);
 
   /** ATP-style career box shown on each player's side of the comparison */
   const sideCard = (name: string, cls: "win-a" | "win-b") => {
@@ -316,9 +322,15 @@ export default function HeadToHeadPage() {
                       {signed(h2h.ratingSwingB)}
                     </span>
                   </div>
-                  {duelBar(
-                    Math.max(0, h2h.ratingSwingA),
-                    Math.max(0, h2h.ratingSwingB),
+                  {/* Net ELO is zero-sum, so scale the gap smoothly instead of
+                      splitting by raw share — a ±100 swing leans the bar hard
+                      one way but never wipes the other colour out entirely. */}
+                  {shareBar(
+                    0.5 +
+                      0.5 *
+                        Math.tanh(
+                          (h2h.ratingSwingA - h2h.ratingSwingB) / 240,
+                        ),
                   )}
                 </div>
                 <div className="duel-meta">
