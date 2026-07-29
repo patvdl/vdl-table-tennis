@@ -6,9 +6,10 @@ import { formatDate, round0, pct, signed } from "../lib/format";
 import H2HChart from "../components/H2HChart";
 import Avatar from "../components/Avatar";
 import PlayerName from "../components/PlayerName";
+import StreakBadge from "../components/StreakBadge";
 
 export default function HeadToHeadPage() {
-  const { playerNames, replayResult, board } = useMatches();
+  const { playerNames, replayResult, board, tournaments } = useMatches();
   const [params, setParams] = useSearchParams();
 
   const [a, setA] = useState(params.get("a") ?? "");
@@ -32,6 +33,111 @@ export default function HeadToHeadPage() {
     if (!replayResult.stats.has(a) || !replayResult.stats.has(b)) return null;
     return predictMatch(replayResult.enriched, replayResult.stats, a, b);
   }, [a, b, replayResult]);
+
+  /** Date of each player's first recorded match */
+  const firstPlayed = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of replayResult.enriched) {
+      if (!map.has(m.player1)) map.set(m.player1, m.date);
+      if (!map.has(m.player2)) map.set(m.player2, m.date);
+    }
+    return map;
+  }, [replayResult]);
+
+  /** Total sets won by each player, counting only meetings with a recorded score */
+  const setsWon = useMemo(() => {
+    if (!h2h) return null;
+    let sa = 0;
+    let sb = 0;
+    let any = false;
+    for (const m of h2h.matches) {
+      const mm = /^(\d+)\s*[-–]\s*(\d+)$/.exec(m.score?.trim() ?? "");
+      if (!mm) continue;
+      any = true;
+      const w = Number(mm[1]);
+      const l = Number(mm[2]);
+      if (m.winnerName === h2h.a) {
+        sa += w;
+        sb += l;
+      } else {
+        sb += w;
+        sa += l;
+      }
+    }
+    return any ? { a: sa, b: sb } : null;
+  }, [h2h]);
+
+  /** Split bar: green share grows with A's lead, blue with B's */
+  const duelBar = (va: number, vb: number) => {
+    const shareA = va + vb > 0 ? va / (va + vb) : 0.5;
+    return (
+      <div className="duel-bar">
+        <div className="seg-a" style={{ width: `${shareA * 100}%` }} />
+        <div className="seg-b" style={{ width: `${(1 - shareA) * 100}%` }} />
+      </div>
+    );
+  };
+
+  /** ATP-style career box shown on each player's side of the comparison */
+  const sideCard = (name: string, cls: "win-a" | "win-b") => {
+    const s = replayResult.stats.get(name);
+    const rank = board.findIndex((p) => p.name === name) + 1;
+    const titleList = tournaments.filter((t) => t.champion === name);
+    const since = firstPlayed.get(name);
+    return (
+      <div className="side-card">
+        <div className={`side-title ${cls}`}>
+          <Link className="player-link" to={`/player/${encodeURIComponent(name)}`}>
+            <PlayerName name={name} />
+          </Link>
+        </div>
+        <div className="sc-row">
+          <span className="k">Rank</span>
+          <span className="v mono">{rank > 0 ? `#${rank}` : "Unrated"}</span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Rating</span>
+          <span className="v mono">{s && rank > 0 ? round0(s.rating) : "—"}</span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Peak rating</span>
+          <span className="v mono">{s && rank > 0 ? round0(s.peakRating) : "—"}</span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Career W–L</span>
+          <span className="v mono">
+            <span style={{ color: "var(--green)" }}>{s?.wins ?? 0}</span>–
+            <span style={{ color: "var(--red)" }}>{s?.losses ?? 0}</span>
+          </span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Win rate</span>
+          <span className="v mono">
+            {s && s.played > 0 ? pct(s.wins / s.played) : "—"}
+          </span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Current streak</span>
+          <span className="v">
+            <StreakBadge streak={s?.streak ?? 0} />
+          </span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Titles</span>
+          <span
+            className="v mono"
+            title={titleList.map((t) => t.name).join(", ") || undefined}
+          >
+            {titleList.length}
+          </span>
+        </div>
+        <div className="sc-row">
+          <span className="k">Playing since</span>
+          <span className="v">{since ? formatDate(since) : "—"}</span>
+        </div>
+      </div>
+    );
+  };
 
   const streakLabel = (s: number) =>
     s === 0 ? "—" : s > 0 ? `W${s}` : `L${-s}`;
@@ -158,57 +264,74 @@ export default function HeadToHeadPage() {
               </div>
             </div>
 
-            <div className="duel">
-              {(() => {
-                const sA = replayResult.stats.get(h2h.a);
-                const sB = replayResult.stats.get(h2h.b);
-                const rankA = board.findIndex((p) => p.name === h2h.a) + 1;
-                const rankB = board.findIndex((p) => p.name === h2h.b) + 1;
-                return (
-                  <>
-                    <div className="duel-row">
-                      <span className="duel-a">{sA && rankA > 0 ? round0(sA.rating) : "—"}</span>
+            <div className="h2h-compare">
+              {sideCard(h2h.a, "win-a")}
+
+              <div className="duel">
+                <div className="duel-row">
+                  <div className="duel-vals">
+                    <span className="duel-a">{h2h.winsA}</span>
+                    <span className="duel-label">
+                      Wins
+                      <small>this matchup</small>
+                    </span>
+                    <span className="duel-b">{h2h.winsB}</span>
+                  </div>
+                  {duelBar(h2h.winsA, h2h.winsB)}
+                </div>
+                {setsWon && (
+                  <div className="duel-row">
+                    <div className="duel-vals">
+                      <span className="duel-a">{setsWon.a}</span>
                       <span className="duel-label">
-                        Rating
-                        <small>overall</small>
+                        Sets won
+                        <small>scored matches</small>
                       </span>
-                      <span className="duel-b">{sB && rankB > 0 ? round0(sB.rating) : "—"}</span>
+                      <span className="duel-b">{setsWon.b}</span>
                     </div>
-                    <div className="duel-row">
-                      <span className="duel-a">{rankA > 0 ? `#${rankA}` : "—"}</span>
-                      <span className="duel-label">
-                        Rank
-                        <small>overall</small>
-                      </span>
-                      <span className="duel-b">{rankB > 0 ? `#${rankB}` : "—"}</span>
-                    </div>
-                  </>
-                );
-              })()}
-              <div className="duel-row">
-                <span className="duel-a">W{h2h.bestStreakA}</span>
-                <span className="duel-label">
-                  Best streak
-                  <small>this matchup</small>
-                </span>
-                <span className="duel-b">W{h2h.bestStreakB}</span>
+                    {duelBar(setsWon.a, setsWon.b)}
+                  </div>
+                )}
+                <div className="duel-row">
+                  <div className="duel-vals">
+                    <span className="duel-a">W{h2h.bestStreakA}</span>
+                    <span className="duel-label">
+                      Best streak
+                      <small>this matchup</small>
+                    </span>
+                    <span className="duel-b">W{h2h.bestStreakB}</span>
+                  </div>
+                  {duelBar(h2h.bestStreakA, h2h.bestStreakB)}
+                </div>
+                <div className="duel-row">
+                  <div className="duel-vals">
+                    <span
+                      className={`duel-a ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}
+                    >
+                      {signed(h2h.ratingSwingA)}
+                    </span>
+                    <span className="duel-label">
+                      Net ELO
+                      <small>this matchup</small>
+                    </span>
+                    <span
+                      className={`duel-b ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}
+                    >
+                      {signed(h2h.ratingSwingB)}
+                    </span>
+                  </div>
+                  {duelBar(
+                    Math.max(0, h2h.ratingSwingA),
+                    Math.max(0, h2h.ratingSwingB),
+                  )}
+                </div>
+                <div className="duel-meta">
+                  first meeting {formatDate(h2h.firstMeeting)} · latest{" "}
+                  {formatDate(h2h.lastMeeting)}
+                </div>
               </div>
-              <div className="duel-row">
-                <span className={`duel-a ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}>
-                  {signed(h2h.ratingSwingA)}
-                </span>
-                <span className="duel-label">
-                  Net ELO
-                  <small>this matchup</small>
-                </span>
-                <span className={`duel-b ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}>
-                  {signed(h2h.ratingSwingB)}
-                </span>
-              </div>
-              <div className="duel-meta">
-                first meeting {formatDate(h2h.firstMeeting)} · latest{" "}
-                {formatDate(h2h.lastMeeting)}
-              </div>
+
+              {sideCard(h2h.b, "win-b")}
             </div>
 
             {predictionBlock}
