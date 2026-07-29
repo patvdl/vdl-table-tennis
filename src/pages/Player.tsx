@@ -131,31 +131,8 @@ export default function PlayerPage() {
               {playerActions}
             </h2>
             <p className="sub" style={{ margin: 0 }}>Full career profile</p>
-            <div className="headline-stats">
-              <div className="hstat">
-                <div className="num">{isRated ? round0(stats.rating) : "—"}</div>
-                <div className="lbl">rating</div>
-              </div>
-              <div className="hstat">
-                <div className="num">
-                  <span style={{ color: "var(--green)" }}>{stats.wins}</span>–
-                  <span style={{ color: "var(--red)" }}>{stats.losses}</span>
-                </div>
-                <div className="lbl">record</div>
-              </div>
-              <div className="hstat">
-                <div className="num">{pct(stats.wins / Math.max(stats.played, 1))}</div>
-                <div className="lbl">win rate</div>
-              </div>
-              <div className="hstat">
-                <div className="num">
-                  <StreakBadge streak={stats.streak} />
-                </div>
-                <div className="lbl">streak</div>
-              </div>
-            </div>
             {!isRated && (
-              <p className="sub" style={{ margin: "10px 0 0" }}>
+              <p className="sub" style={{ margin: "8px 0 0" }}>
                 Ranked after {RATED_MIN - stats.played} more{" "}
                 {RATED_MIN - stats.played === 1 ? "match" : "matches"}.
               </p>
@@ -163,173 +140,214 @@ export default function PlayerPage() {
           </div>
         </div>
 
-        <div className="detail-grid">
-          <div className="detail-row">
-            <span className="detail-label">Peak rating</span>
-            <span className="detail-value">
-              {isRated ? (
-                <>
-                  <span className="mono">{round0(stats.peakRating)}</span>
-                  <span className="detail-hint">
+        <div className="stat-groups">
+          <div className="stat-group">
+            <div className="group-title">Rating</div>
+            <div className="group-hero">
+              <span className="big">{isRated ? round0(stats.rating) : "—"}</span>
+              <span className="ctx">current</span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Peak</span>
+              <span className="v">
+                {isRated ? (
+                  <>
+                    <span className="mono">{round0(stats.peakRating)}</span>
+                    <span className="hint">
+                      {" "}
+                      ·{" "}
+                      {stats.peakRating > START_RATING
+                        ? formatDate(stats.peakDate)
+                        : `at start rating since ${formatDate(stats.peakDate)}`}
+                    </span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Lowest</span>
+              <span className="v">
+                {isRated && lowest ? (
+                  <>
+                    <span className="mono">{round0(lowest.rating)}</span>
+                    <span className="hint"> · {formatDate(lowest.date)}</span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div className="stat-group">
+            <div className="group-title">Record</div>
+            <div className="group-hero">
+              <span className="big">
+                <span style={{ color: "var(--green)" }}>{stats.wins}</span>–
+                <span style={{ color: "var(--red)" }}>{stats.losses}</span>
+              </span>
+              <span className="ctx">{pct(stats.wins / Math.max(stats.played, 1))} win rate</span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Matches</span>
+              <span className="v">
+                <span className="mono">{stats.played}</span>
+              </span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Last played</span>
+              <span className="v">{formatDate(stats.lastPlayed)}</span>
+            </div>
+          </div>
+
+          <div className="stat-group">
+            <div className="group-title">Time at the top</div>
+            <div className="group-hero">
+              <span className="big">{standings.no1 ? standings.no1.days : "—"}</span>
+              <span className="ctx">
+                days at #1
+                {standings.no1 && (
+                  <>
                     {" "}
-                    ·{" "}
-                    {stats.peakRating > START_RATING
-                      ? formatDate(stats.peakDate)
-                      : `at start rating since ${formatDate(stats.peakDate)}`}
-                  </span>
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
+                    · {standings.no1.spans.length}{" "}
+                    {standings.no1.spans.length === 1 ? "stint" : "stints"}{" "}
+                    <button className="link-btn" onClick={() => setSpansModal("no1")}>
+                      details
+                    </button>
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Days in top 5</span>
+              <span className="v">
+                {standings.top5 ? (
+                  <>
+                    <span className="mono">{standings.top5.days}</span>
+                    <span className="hint">
+                      {" "}
+                      · {standings.top5.spans.length}{" "}
+                      {standings.top5.spans.length === 1 ? "stint" : "stints"}
+                    </span>{" "}
+                    <button className="link-btn" onClick={() => setSpansModal("top5")}>
+                      details
+                    </button>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Career-high rank</span>
+              <span className="v">
+                {stats.bestRankDate ? (
+                  <>
+                    <span className="mono">#{stats.bestRank}</span>
+                    <span className="hint"> · {formatDate(stats.bestRankDate)}</span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+            </div>
           </div>
-          <div className="detail-row">
-            <span className="detail-label">Lowest rating</span>
-            <span className="detail-value">
-              {isRated && lowest ? (
-                <>
-                  <span className="mono">{round0(lowest.rating)}</span>
-                  <span className="detail-hint"> · {formatDate(lowest.date)}</span>
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
+
+          <div className="stat-group">
+            <div className="group-title">Streaks</div>
+            <div className="group-hero">
+              <span className="big">
+                <StreakBadge streak={stats.streak} />
+              </span>
+              <span className="ctx">current</span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Best</span>
+              <span className="v">
+                {streaks.bestWin ? (
+                  <>
+                    <span className="mono" style={{ color: "var(--green)" }}>
+                      W{streaks.bestWin.length}
+                    </span>
+                    <span className="hint">
+                      {" "}
+                      · {formatDate(streaks.bestWin.start)} →{" "}
+                      {streaks.bestWin.end
+                        ? formatDate(streaks.bestWin.end)
+                        : "still active"}
+                    </span>{" "}
+                    <button className="link-btn" onClick={() => setStreakModal("win")}>
+                      details
+                    </button>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Worst</span>
+              <span className="v">
+                {streaks.worstLoss ? (
+                  <>
+                    <span className="mono" style={{ color: "var(--red)" }}>
+                      L{streaks.worstLoss.length}
+                    </span>
+                    <span className="hint">
+                      {" "}
+                      · {formatDate(streaks.worstLoss.start)} →{" "}
+                      {streaks.worstLoss.end
+                        ? formatDate(streaks.worstLoss.end)
+                        : "still active"}
+                    </span>{" "}
+                    <button className="link-btn" onClick={() => setStreakModal("loss")}>
+                      details
+                    </button>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+            </div>
           </div>
-          <div className="detail-row">
-            <span className="detail-label">Career-high rank</span>
-            <span className="detail-value">
-              {stats.bestRankDate ? (
-                <>
-                  <span className="mono">#{stats.bestRank}</span>
-                  <span className="detail-hint"> · {formatDate(stats.bestRankDate)}</span>
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Best win</span>
-            <span className="detail-value">
+
+          <div className="stat-group">
+            <div className="group-title">Highlights</div>
+            <div className="group-hero">
               {bestWin ? (
                 <>
-                  beat <PlayerName name={bestWin.match.loserName} />{" "}
-                  <span className="mono">#{bestWin.opponentRank}</span>
-                  <span className="detail-hint">
-                    {" "}
-                    · {formatDate(bestWin.match.date)}
+                  <span className="big">#{bestWin.opponentRank}</span>
+                  <span className="ctx">
+                    best win — beat <PlayerName name={bestWin.match.loserName} /> ·{" "}
+                    {formatDate(bestWin.match.date)}
                     {bestWin.match.score ? ` · ${bestWin.match.score}` : ""}
                   </span>
                 </>
               ) : (
-                "—"
-              )}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Days at #1</span>
-            <span className="detail-value">
-              {standings.no1 ? (
                 <>
-                  <span className="mono">{standings.no1.days}</span>
-                  <span className="detail-hint">
-                    {" "}
-                    · {standings.no1.spans.length}{" "}
-                    {standings.no1.spans.length === 1 ? "stint" : "stints"}
-                    {standings.no1.current ? " · now #1" : ""}
-                  </span>{" "}
-                  <button className="link-btn" onClick={() => setSpansModal("no1")}>
-                    details
-                  </button>
+                  <span className="big">—</span>
+                  <span className="ctx">no wins over ranked players yet</span>
                 </>
-              ) : (
-                "—"
               )}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Days in top 5</span>
-            <span className="detail-value">
-              {standings.top5 ? (
-                <>
-                  <span className="mono">{standings.top5.days}</span>
-                  <span className="detail-hint">
-                    {" "}
-                    · {standings.top5.spans.length}{" "}
-                    {standings.top5.spans.length === 1 ? "stint" : "stints"}
-                    {standings.top5.current ? " · now in top 5" : ""}
-                  </span>{" "}
-                  <button className="link-btn" onClick={() => setSpansModal("top5")}>
-                    details
-                  </button>
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Best win streak</span>
-            <span className="detail-value">
-              {streaks.bestWin ? (
-                <>
-                  <span className="mono" style={{ color: "var(--green)" }}>
-                    W{streaks.bestWin.length}
-                  </span>
-                  <span className="detail-hint">
-                    {" "}
-                    · {formatDate(streaks.bestWin.start)} →{" "}
-                    {streaks.bestWin.end ? formatDate(streaks.bestWin.end) : "still active"}
-                  </span>{" "}
-                  <button className="link-btn" onClick={() => setStreakModal("win")}>
-                    details
-                  </button>
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Worst losing streak</span>
-            <span className="detail-value">
-              {streaks.worstLoss ? (
-                <>
-                  <span className="mono" style={{ color: "var(--red)" }}>
-                    L{streaks.worstLoss.length}
-                  </span>
-                  <span className="detail-hint">
-                    {" "}
-                    · {formatDate(streaks.worstLoss.start)} →{" "}
-                    {streaks.worstLoss.end
-                      ? formatDate(streaks.worstLoss.end)
-                      : "still active"}
-                  </span>{" "}
-                  <button className="link-btn" onClick={() => setStreakModal("loss")}>
-                    details
-                  </button>
-                </>
-              ) : (
-                "—"
-              )}
-            </span>
-          </div>
-          {titles.length > 0 && (
-            <div className="detail-row">
-              <span className="detail-label">Tournament titles</span>
-              <span className="detail-value">
-                <span className="mono">{titles.length}</span>
-                <span className="detail-hint">
-                  {" "}
-                  · {titles.map((t) => t.name).join(" · ")}
-                </span>
+            </div>
+            <div className="sg-row">
+              <span className="k">Tournament titles</span>
+              <span className="v">
+                {titles.length > 0 ? (
+                  <>
+                    <span className="mono">{titles.length}</span>
+                    <span className="hint">
+                      {" "}
+                      · {titles.map((t) => t.name).join(" · ")}
+                    </span>
+                  </>
+                ) : (
+                  "—"
+                )}
               </span>
             </div>
-          )}
-          <div className="detail-row">
-            <span className="detail-label">Last played</span>
-            <span className="detail-value">{formatDate(stats.lastPlayed)}</span>
           </div>
         </div>
         {isRated && (

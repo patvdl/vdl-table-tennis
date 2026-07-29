@@ -8,7 +8,7 @@ import Avatar from "../components/Avatar";
 import PlayerName from "../components/PlayerName";
 
 export default function HeadToHeadPage() {
-  const { playerNames, replayResult } = useMatches();
+  const { playerNames, replayResult, board } = useMatches();
   const [params, setParams] = useSearchParams();
 
   const [a, setA] = useState(params.get("a") ?? "");
@@ -158,37 +158,54 @@ export default function HeadToHeadPage() {
               </div>
             </div>
 
-            <div className="tape">
-              <div className="tape-row">
-                <span className={`tape-a ${h2h.streakHolder === h2h.a ? "win-a" : "tape-dim"}`}>
-                  {h2h.streakHolder === h2h.a ? `W${h2h.streakLength}` : "—"}
-                </span>
-                <span className="tape-label" title="Who has won the recent meetings in a row">
-                  Current streak
-                </span>
-                <span className={`tape-b ${h2h.streakHolder === h2h.b ? "win-b" : "tape-dim"}`}>
-                  {h2h.streakHolder === h2h.b ? `W${h2h.streakLength}` : "—"}
-                </span>
-              </div>
-              <div className="tape-row">
-                <span className="tape-a win-a">W{h2h.bestStreakA}</span>
-                <span className="tape-label" title="Most consecutive wins in this matchup">
+            <div className="duel">
+              {(() => {
+                const sA = replayResult.stats.get(h2h.a);
+                const sB = replayResult.stats.get(h2h.b);
+                const rankA = board.findIndex((p) => p.name === h2h.a) + 1;
+                const rankB = board.findIndex((p) => p.name === h2h.b) + 1;
+                return (
+                  <>
+                    <div className="duel-row">
+                      <span className="duel-a">{sA && rankA > 0 ? round0(sA.rating) : "—"}</span>
+                      <span className="duel-label">
+                        Rating
+                        <small>overall</small>
+                      </span>
+                      <span className="duel-b">{sB && rankB > 0 ? round0(sB.rating) : "—"}</span>
+                    </div>
+                    <div className="duel-row">
+                      <span className="duel-a">{rankA > 0 ? `#${rankA}` : "—"}</span>
+                      <span className="duel-label">
+                        Rank
+                        <small>overall</small>
+                      </span>
+                      <span className="duel-b">{rankB > 0 ? `#${rankB}` : "—"}</span>
+                    </div>
+                  </>
+                );
+              })()}
+              <div className="duel-row">
+                <span className="duel-a">W{h2h.bestStreakA}</span>
+                <span className="duel-label">
                   Best streak
+                  <small>this matchup</small>
                 </span>
-                <span className="tape-b win-b">W{h2h.bestStreakB}</span>
+                <span className="duel-b">W{h2h.bestStreakB}</span>
               </div>
-              <div className="tape-row">
-                <span className={`tape-a ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}>
+              <div className="duel-row">
+                <span className={`duel-a ${h2h.ratingSwingA >= 0 ? "delta-up" : "delta-down"}`}>
                   {signed(h2h.ratingSwingA)}
                 </span>
-                <span className="tape-label" title="Net ELO gained or lost from this matchup">
-                  Rating swing
+                <span className="duel-label">
+                  Net ELO
+                  <small>this matchup</small>
                 </span>
-                <span className={`tape-b ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}>
+                <span className={`duel-b ${h2h.ratingSwingB >= 0 ? "delta-up" : "delta-down"}`}>
                   {signed(h2h.ratingSwingB)}
                 </span>
               </div>
-              <div className="tape-meta">
+              <div className="duel-meta">
                 first meeting {formatDate(h2h.firstMeeting)} · latest{" "}
                 {formatDate(h2h.lastMeeting)}
               </div>
